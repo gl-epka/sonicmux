@@ -1257,6 +1257,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "trycmd",
+ "which",
 ]
 
 [[package]]
