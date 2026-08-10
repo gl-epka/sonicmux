@@ -1,6 +1,6 @@
 # M3 design: FFmpeg execution and safe output transaction
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-11
 - Milestone: M3
 

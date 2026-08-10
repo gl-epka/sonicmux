@@ -1,6 +1,6 @@
 # ADR-0005: Put the media backend port in a dedicated crate
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-11
 
 ## Context

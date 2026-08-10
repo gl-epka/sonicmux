@@ -105,7 +105,8 @@ pub trait MediaBackend: Send + Sync {
 }
 ```
 
-This trait belongs to the application/runtime boundary. `sonicmux-core` owns the
+This trait belongs to the application boundary and, as refined by ADR-0005,
+lives in the dedicated `sonicmux-backend` port crate. `sonicmux-core` owns the
 domain types and pure planner but has no dependency on async runtimes, process
 APIs, FFmpeg, or this trait. `MockBackend` is supplied by runtime test support.
 
