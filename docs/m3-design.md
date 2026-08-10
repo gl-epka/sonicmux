@@ -351,7 +351,8 @@ integration tests.
   mismatch remove the staging file;
 - cleanup happens only after the mock process reports it has been reaped;
 - a commit failure keeps the original destination intact;
-- the backend sees a staging path in the final parent, never the final path.
+- the backend sees a staging path inside the private directory in the final
+  parent, never the final path.
 
 ### Generated FFmpeg integration test
 
@@ -380,7 +381,7 @@ console-window/process leak before M3 is accepted as implemented.
 Versions are resolved and locked during implementation, subject to the workspace
 MSRV and license checks:
 
-- `async-trait 0.1.91` for the dyn-compatible port;
+- `async-trait 0.1.92` for the dyn-compatible port;
 - `tokio-util 0.7.19` for hierarchical cancellation tokens;
 - `tempfile 3.27.0` for private same-parent RAII staging;
 - `renamore 0.3.2` for atomic, non-replacing rename on the three target operating
@@ -394,7 +395,7 @@ All are used behind narrow internal modules. Production workspace source keeps
 Protocol and API choices were checked against the current
 [FFmpeg manual](https://ffmpeg.org/ffmpeg.html),
 [FFprobe manual](https://ffmpeg.org/ffprobe.html),
-[`async-trait` documentation](https://docs.rs/async-trait/0.1.91/async_trait/),
+[`async-trait` documentation](https://docs.rs/async-trait/0.1.92/async_trait/),
 [`CancellationToken` documentation](https://docs.rs/tokio-util/0.7.19/tokio_util/sync/struct.CancellationToken.html),
 [`tempfile` path-guard documentation](https://docs.rs/tempfile/3.27.0/tempfile/struct.TempPath.html),
 [`renamore` exclusive-rename documentation](https://docs.rs/renamore/0.3.2/renamore/fn.rename_exclusive.html),
