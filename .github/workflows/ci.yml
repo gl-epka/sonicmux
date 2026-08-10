@@ -77,7 +77,10 @@ jobs:
       - name: Convert generated DTS fixture
         env:
           SONICMUX_RUN_FFMPEG_TESTS: "1"
-        run: cargo test -p sonicmux-runtime --test ffmpeg_execution
+        run: |
+          cargo test -p sonicmux-runtime --test ffmpeg_execution
+          ./testdata/generate-m3-fixture.sh /tmp/sonicmux-cli-fixture.mkv
+          SONICMUX_CLI_FIXTURE=/tmp/sonicmux-cli-fixture.mkv cargo test -p sonicmux-cli --test real_ffmpeg
 
   beta:
     name: Rust beta (allowed to fail)

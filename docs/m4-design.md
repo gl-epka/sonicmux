@@ -1,6 +1,6 @@
 # M4 design: complete sequential CLI
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-11
 - Milestone: M4
 

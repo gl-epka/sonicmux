@@ -1,0 +1,11 @@
+```console
+$ sonicmux convert movie.mkv --codec flac
+? 2
+error: invalid value 'flac' for '--codec <CODEC>'
+  [possible values: ac3, eac3, aac]
+
+  tip: a similar value exists: 'aac'
+
+For more information, try '--help'.
+
+```

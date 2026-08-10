@@ -1,6 +1,6 @@
 # ADR-0006: Version CLI machine output independently from domain types
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-11
 
 ## Context
