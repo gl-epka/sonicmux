@@ -1053,10 +1053,7 @@ async fn prepare_phase(
 
     loop {
         if !stop_admission {
-            loop {
-                let Some((index, file)) = pending.pop_front() else {
-                    break;
-                };
+            while let Some((index, file)) = pending.pop_front() {
                 let Ok(permit) = Arc::clone(&semaphore).try_acquire_owned() else {
                     pending.push_front((index, file));
                     break;
@@ -1486,10 +1483,7 @@ async fn execute_phase(
 
     loop {
         if !stop_admission {
-            loop {
-                let Some((index, plan)) = pending.pop_front() else {
-                    break;
-                };
+            while let Some((index, plan)) = pending.pop_front() {
                 let Ok(permit) = Arc::clone(&semaphore).try_acquire_owned() else {
                     pending.push_front((index, plan));
                     break;
