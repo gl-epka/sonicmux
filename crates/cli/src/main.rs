@@ -528,14 +528,8 @@ async fn convert_command(
     let render_cancel = cancel.clone();
     let storage_profile = config.storage_profile.value().clone();
     let render_task = tokio::spawn(async move {
-        let result = render_batch_events(
-            events,
-            snapshots,
-            output,
-            render_sequence,
-            &storage_profile,
-        )
-        .await;
+        let result =
+            render_batch_events(events, snapshots, output, render_sequence, &storage_profile).await;
         if result.is_err() {
             render_cancel.cancel();
         }
