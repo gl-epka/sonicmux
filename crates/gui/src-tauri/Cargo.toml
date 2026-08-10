@@ -1,0 +1,15 @@
+[package]
+name = "sonicmux-gui"
+description = "Tauri adapter for the SonicMux graphical interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+sonicmux-core.workspace = true
+sonicmux-runtime.workspace = true
+
+[lints]
+workspace = true

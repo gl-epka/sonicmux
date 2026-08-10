@@ -1,0 +1,14 @@
+[package]
+name = "sonicmux-core"
+description = "Pure domain model and planning for SonicMux"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+[lints]
+workspace = true
