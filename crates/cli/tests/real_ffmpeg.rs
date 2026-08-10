@@ -99,6 +99,36 @@ fn two_generated_inputs_convert_in_one_parallel_batch() {
             assert!(status.success());
         }
     }
+    let dry_run = cargo_bin_cmd!("sonicmux")
+        .args(["--json-progress", "convert"])
+        .args([&first, &second])
+        .args(["--jobs", "2", "--dry-run", "--output-dir"])
+        .arg(&output_directory)
+        .output()
+        .expect("parallel dry-run launches");
+    assert!(dry_run.status.success());
+    let events: Vec<serde_json::Value> = String::from_utf8(dry_run.stdout)
+        .expect("NDJSON is UTF-8")
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("NDJSON event parses"))
+        .collect();
+    assert!(events.iter().enumerate().all(|(sequence, event)| {
+        event["schema"] == "sonicmux.event" && event["sequence"] == sequence
+    }));
+    assert_eq!(events[0]["event"], "batch_started");
+    assert_eq!(events[0]["data"]["jobs"], 2);
+    assert_eq!(events[0]["data"]["storage_profile"], "balanced");
+    assert_eq!(
+        events.last().expect("terminal event exists")["event"],
+        "batch_finished"
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event["event"] == "file_succeeded")
+            .count(),
+        2
+    );
     let conversion = cargo_bin_cmd!("sonicmux")
         .args(["--json", "convert"])
         .args([&first, &second])

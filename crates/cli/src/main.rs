@@ -526,8 +526,16 @@ async fn convert_command(
     let (snapshots, events, waiter) = handle.into_parts();
     let render_sequence = Arc::clone(&sequence);
     let render_cancel = cancel.clone();
+    let storage_profile = config.storage_profile.value().clone();
     let render_task = tokio::spawn(async move {
-        let result = render_batch_events(events, snapshots, output, render_sequence).await;
+        let result = render_batch_events(
+            events,
+            snapshots,
+            output,
+            render_sequence,
+            &storage_profile,
+        )
+        .await;
         if result.is_err() {
             render_cancel.cancel();
         }
@@ -565,6 +573,7 @@ async fn render_batch_events(
     snapshots: watch::Receiver<Arc<BatchSnapshot>>,
     output: OutputMode,
     sequence: Arc<AtomicU64>,
+    storage_profile: &str,
 ) -> Result<(), CliFailure> {
     let visible = !output.json
         && !output.json_progress
@@ -579,7 +588,7 @@ async fn render_batch_events(
         match events.recv().await {
             Ok(event) => {
                 if output.json_progress {
-                    emit_scheduler_event(&sequence, &event)?;
+                    emit_scheduler_event(&sequence, &event, storage_profile)?;
                 }
                 if let Some(multi) = &multi {
                     render_batch_snapshot(
@@ -612,7 +621,11 @@ async fn render_batch_events(
     Ok(())
 }
 
-fn emit_scheduler_event(sequence: &Arc<AtomicU64>, event: &BatchEvent) -> Result<(), CliFailure> {
+fn emit_scheduler_event(
+    sequence: &Arc<AtomicU64>,
+    event: &BatchEvent,
+    storage_profile: &str,
+) -> Result<(), CliFailure> {
     match event {
         BatchEvent::BatchStarted {
             total,
@@ -625,6 +638,7 @@ fn emit_scheduler_event(sequence: &Arc<AtomicU64>, event: &BatchEvent) -> Result
                 "command": "convert",
                 "files": total,
                 "jobs": concurrency,
+                "storage_profile": storage_profile,
                 "failure_policy": failure_policy.as_str(),
             }),
         ),
