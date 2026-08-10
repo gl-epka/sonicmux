@@ -390,7 +390,12 @@ async fn validate_staging_file(path: &Path) -> Result<(), ExecutionError> {
 }
 
 async fn sync_file(path: &Path) -> io::Result<()> {
-    fs::File::open(path).await?.sync_all().await
+    fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .await?
+        .sync_all()
+        .await
 }
 
 async fn cleanup_or(primary: ExecutionError, staging: StagingGuard) -> ExecutionError {
@@ -622,11 +627,18 @@ fn validate_timing(
     let actual_timing = actual.common().timing();
     if let Some(expected_start) = expected_timing.start() {
         let close = actual_timing.start().is_some_and(|actual_start| {
-            if matches!(expected.codec(), ExpectedCodec::Encoded(_)) {
+            if let ExpectedCodec::Encoded(label) = expected.codec() {
                 actual
                     .as_audio()
                     .and_then(|audio| audio.sample_rate())
-                    .is_some_and(|rate| within_samples(expected_start, actual_start, rate.get(), 1))
+                    .is_some_and(|rate| {
+                        within_samples(
+                            expected_start,
+                            actual_start,
+                            rate.get(),
+                            codec_frame_samples(label),
+                        )
+                    })
             } else {
                 within_actual_ticks(expected_start, actual_start, 1)
             }
@@ -816,15 +828,15 @@ mod tests {
     };
     use sonicmux_core::{
         Ac3Bitrate, AudioCodec, AudioStream, AudioTarget, ChannelCount, Channels,
-        CompatibilityPolicy, Dispositions, DtsProfile, FormatInfo, MediaInfo, Metadata, OutputMode,
-        PlanOutcome, PlanningPolicy, ProfileName, RequestedAction, StreamCommon, StreamIndex,
-        StreamInfo, TargetLayout, VideoStream, build,
+        CompatibilityPolicy, Dispositions, DtsProfile, FormatInfo, MediaInfo, MediaTimestamp,
+        Metadata, OutputMode, PlanOutcome, PlanningPolicy, ProfileName, RequestedAction,
+        StreamCommon, StreamIndex, StreamInfo, TargetLayout, TimeBase, VideoStream, build,
     };
     use tempfile::TempDir;
     use tokio::sync::mpsc;
     use tokio_util::sync::CancellationToken;
 
-    use super::{ExecutionError, execute_safely};
+    use super::{ExecutionError, codec_frame_samples, execute_safely, within_samples};
 
     #[derive(Debug, Clone, Copy)]
     enum Behavior {
@@ -1029,6 +1041,28 @@ mod tests {
             })
             .count();
         assert_eq!(staging, 0);
+    }
+
+    #[test]
+    fn encoded_start_accepts_one_codec_frame_of_encoder_priming() {
+        let milliseconds = TimeBase::new(1, 1_000).expect("time base is valid");
+        let expected = MediaTimestamp::new(0, milliseconds);
+        let five_ms_early = MediaTimestamp::new(-5, milliseconds);
+        let thirty_three_ms_early = MediaTimestamp::new(-33, milliseconds);
+        let frame_samples = codec_frame_samples("AC-3");
+
+        assert!(within_samples(
+            expected,
+            five_ms_early,
+            48_000,
+            frame_samples
+        ));
+        assert!(!within_samples(
+            expected,
+            thirty_three_ms_early,
+            48_000,
+            frame_samples
+        ));
     }
 
     #[tokio::test]

@@ -311,8 +311,9 @@ structured list of mismatches:
 - chapter count, tags, and rational start/end times;
 - attachment count plus expected filename and MIME type;
 - copied stream start times/durations within one output time-base tick;
-- encoded audio start time within one audio sample and end duration within one
-  codec frame, with the applied tolerance recorded in the report.
+- encoded audio start time and end duration within one codec frame, accounting
+  for encoder priming while still bounding drift, with the applied tolerance
+  recorded in the report.
 
 Chapter and stream time bases may be rewritten by Matroska. Validation therefore
 compares rational time values by cross multiplication, with the stated one-tick
