@@ -60,6 +60,25 @@ jobs:
       - name: Test workspace
         run: cargo test --workspace --all-targets
 
+  ffmpeg-integration:
+    name: Real FFmpeg integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+      - name: Convert generated DTS fixture
+        env:
+          SONICMUX_RUN_FFMPEG_TESTS: "1"
+        run: cargo test -p sonicmux-runtime --test ffmpeg_execution
+
   beta:
     name: Rust beta (allowed to fail)
     continue-on-error: true
