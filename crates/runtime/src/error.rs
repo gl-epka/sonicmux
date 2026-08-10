@@ -12,5 +12,5 @@ pub enum RuntimeError {
 
     /// The configured media backend failed.
     #[error(transparent)]
-    Backend(#[from] sonicmux_ffmpeg::BackendError),
+    Backend(#[from] sonicmux_backend::BackendError),
 }

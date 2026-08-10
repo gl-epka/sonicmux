@@ -1,11 +1,16 @@
 #![doc = "External FFmpeg and FFprobe process adapter for SonicMux."]
 #![forbid(unsafe_code)]
 
+pub mod command;
 pub mod error;
+pub mod execute;
 pub mod probe;
+pub mod progress;
 
-pub use error::BackendError;
-pub use probe::{FfmpegCliBackend, ProbeError, parse_probe_output};
+pub use command::{ArgumentBuild, build_execution_arguments};
+pub use error::ToolError;
+pub use execute::ExecutionError;
+pub use probe::{FfmpegCliBackend, FfmpegToolchainPaths, ProbeError, parse_probe_output};
 
 /// The package name, exposed for workspace smoke tests and diagnostics.
 pub const CRATE_NAME: &str = env!("CARGO_PKG_NAME");
