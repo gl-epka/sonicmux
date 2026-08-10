@@ -8,6 +8,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[derive(Debug, Parser)]
 #[command(
     name = "sonicmux",
+    bin_name = "sonicmux",
     version,
     about = "Make MKV audio playable on TVs without re-encoding video.",
     arg_required_else_help = true
