@@ -13,7 +13,9 @@
       "color": "auto",
       "ffmpeg_path": null,
       "output_directory": null,
-      "log_file": null
+      "log_file": null,
+      "jobs": "2",
+      "storage_profile": "balanced"
     }
   }
 }

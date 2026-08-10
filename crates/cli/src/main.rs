@@ -9,6 +9,7 @@ use std::{
     ffi::OsString,
     fs::OpenOptions,
     io::{self, IsTerminal as _, Write as _},
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     process::ExitCode,
     sync::{
@@ -23,21 +24,23 @@ use args::{
 };
 use clap::{CommandFactory as _, Parser as _, error::ErrorKind};
 use dto::{DoctorDto, PathDto, PlanDto, ProbeDto, ProgressDto};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use serde::Serialize;
 use serde_json::{Value, json};
-use sonicmux_backend::{CapabilityRequest, MediaCapability, ProgressEvent};
+use sonicmux_backend::{CapabilityRequest, MediaCapability};
 use sonicmux_core::{
     AudioSelector, Compatibility, JobPlan, PlanOutcome, PlanningPolicy, RequestedAction,
     StreamIndex,
 };
 use sonicmux_ffmpeg::{FfmpegCliBackend, resolve_toolchain};
 use sonicmux_runtime::{
-    ConfigError, ConfigPath, DefaultConfig, DiscoveryRequest, EffectiveConfig,
-    ExistingOutputOutcome, PartialConfig, Runtime, RuntimeError, discover, initialize_config,
+    ActionRequest, AudioSelectionRequest, BatchEvent, BatchReport, BatchRequest, BatchSnapshot,
+    CancellationReason, ConfigError, ConfigPath, DefaultConfig, DiscoveryRequest, DryRunReport,
+    EffectiveConfig, ExistingOutputOutcome, FailurePolicy, FileOutcome, FileRequest, FileStatus,
+    PartialConfig, Runtime, RuntimeError, SchedulerOptions, discover, initialize_config,
     load_effective_config, load_file, merge_config, select_config_path,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, watch};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug)]
@@ -254,6 +257,12 @@ fn command_overrides(cli: &Cli) -> PartialConfig {
     config.ffmpeg_path = cli.ffmpeg_path.clone();
     config.color = cli.color.map(|value| value.as_str().to_owned());
     config.log_file = cli.log_file.clone();
+    if let Command::Convert(arguments) = &cli.command {
+        config.jobs = arguments.jobs;
+        config.storage_profile = arguments
+            .storage_profile
+            .map(|profile| profile.as_str().to_owned());
+    }
     config
 }
 
@@ -487,143 +496,386 @@ async fn convert_command(
             ));
         }
     }
+    let compatibility = Arc::new(config.compatibility_policy().map_err(config_failure)?);
+    let target = config.audio_target().map_err(config_failure)?;
+    let output_mode = config.output_mode().map_err(config_failure)?;
+    let action = action_request(arguments);
+    let mut requests = Vec::with_capacity(files.len());
+    for path in &files {
+        requests.push(FileRequest::new(
+            path.clone(),
+            resolve_output(path, arguments, config)?,
+            Arc::clone(&compatibility),
+            target.clone(),
+            output_mode,
+            action.clone(),
+        ));
+    }
+    let jobs = NonZeroUsize::new(*config.jobs.value())
+        .ok_or_else(|| CliFailure::new(2, "scheduler jobs must be greater than zero"))?;
+    let failure_policy = if arguments.fail_fast {
+        FailurePolicy::FailFast
+    } else {
+        FailurePolicy::Continue
+    };
+    let options = SchedulerOptions::new(jobs, failure_policy, arguments.dry_run)
+        .map_err(|error| CliFailure::new(2, error.to_string()))?;
     let cancel = cancellation_token();
     let sequence = Arc::new(AtomicU64::new(0));
-    if output.json_progress {
-        emit_event(
-            &sequence,
-            "batch_started",
-            json!({"command": "convert", "files": files.len()}),
-        )?;
-    }
-    let mut results = Vec::new();
-    let mut failures = 0;
-    let mut only_failure_code = 6;
-    for path in &files {
-        let explicit_output = resolve_output(path, arguments, config)?;
-        if output.json_progress {
-            emit_event(
-                &sequence,
-                "file_started",
-                json!({"path": PathDto::new(path)}),
-            )?;
+    let handle = runtime.start_batch(BatchRequest::new(requests, options), cancel.clone());
+    let (snapshots, events, waiter) = handle.into_parts();
+    let render_sequence = Arc::clone(&sequence);
+    let render_cancel = cancel.clone();
+    let render_task = tokio::spawn(async move {
+        let result = render_batch_events(events, snapshots, output, render_sequence).await;
+        if result.is_err() {
+            render_cancel.cancel();
         }
-        let analyzed = analyze(
-            runtime,
-            config,
-            path,
-            Some(explicit_output),
-            arguments.remux_only,
-            &arguments.default_audio,
-            cancel.clone(),
-        )
-        .await;
-        match analyzed {
-            Ok(Analyzed::Skip) => {
-                results.push(json!({"path": PathDto::new(path), "status": "skipped", "reason": "nothing-to-do"}));
-                emit_file_success(output, &sequence, path, "skipped")?;
+        result
+    });
+    let report = waiter
+        .wait()
+        .await
+        .map_err(|error| CliFailure::new(6, error.to_string()))?;
+    render_task
+        .await
+        .map_err(|error| CliFailure::new(6, format!("progress renderer failed: {error}")))??;
+    finish_convert_report(&report, output, &sequence)
+}
+
+fn action_request(arguments: &ConvertArgs) -> ActionRequest {
+    if !arguments.remux_only {
+        return ActionRequest::Convert;
+    }
+    if arguments.default_audio == "first-compatible" {
+        return ActionRequest::RemuxOnly(AudioSelectionRequest::FirstCompatible);
+    }
+    match arguments.default_audio.parse::<u32>() {
+        Ok(index) => {
+            ActionRequest::RemuxOnly(AudioSelectionRequest::StreamIndex(StreamIndex::new(index)))
+        }
+        Err(_) => ActionRequest::RemuxOnly(AudioSelectionRequest::Language(
+            arguments.default_audio.clone(),
+        )),
+    }
+}
+
+async fn render_batch_events(
+    mut events: broadcast::Receiver<BatchEvent>,
+    snapshots: watch::Receiver<Arc<BatchSnapshot>>,
+    output: OutputMode,
+    sequence: Arc<AtomicU64>,
+) -> Result<(), CliFailure> {
+    let visible = !output.json
+        && !output.json_progress
+        && !output.quiet
+        && io::stderr().is_terminal()
+        && std::env::var_os("TERM").is_none_or(|value| value != "dumb");
+    let multi = visible.then(MultiProgress::new);
+    let mut preparation = None;
+    let mut aggregate = None;
+    let mut file_bars = std::collections::HashMap::new();
+    loop {
+        match events.recv().await {
+            Ok(event) => {
+                if output.json_progress {
+                    emit_scheduler_event(&sequence, &event)?;
+                }
+                if let Some(multi) = &multi {
+                    render_batch_snapshot(
+                        multi,
+                        &snapshots.borrow(),
+                        &mut preparation,
+                        &mut aggregate,
+                        &mut file_bars,
+                    );
+                }
             }
-            Ok(Analyzed::Plan { plan, .. }) if arguments.dry_run => {
-                let existing = runtime
-                    .inspect_existing_output(&plan, cancel.clone())
-                    .await
-                    .map_err(|error| runtime_failure(error, 6))?;
-                let state = existing_state(&existing);
-                let dto = PlanDto::from(plan.as_ref());
-                results.push(json!({"status": "dry-run", "existing_output": state, "plan": dto}));
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
                 if output.json_progress {
                     emit_event(
                         &sequence,
-                        "file_succeeded",
-                        json!({"status": "dry-run", "existing_output": state, "plan": dto}),
-                    )?;
-                } else if !output.json && !output.quiet {
-                    write_human(
-                        &format!("dry-run: {}; existing output: {state}", human::plan(&plan)),
-                        output.color,
+                        "progress_resync",
+                        json!({
+                            "skipped_events": skipped,
+                            "snapshot": batch_snapshot_value(&snapshots.borrow()),
+                        }),
                     )?;
                 }
             }
-            Ok(Analyzed::Plan { plan, .. }) => {
-                match runtime.inspect_existing_output(&plan, cancel.clone()).await {
-                    Ok(ExistingOutputOutcome::Valid) => {
-                        results.push(json!({"path": PathDto::new(path), "status": "skipped", "reason": "valid-existing-output"}));
-                        emit_file_success(output, &sequence, path, "valid-existing-output")?;
-                    }
-                    Ok(ExistingOutputOutcome::Conflict { mismatches }) => {
-                        failures += 1;
-                        only_failure_code = 6;
-                        let failure = CliFailure::new(
-                            6,
-                            format!(
-                                "output already exists and conflicts ({} mismatch(es))",
-                                mismatches.len()
-                            ),
-                        );
-                        results.push(error_value(path, &failure));
-                        emit_file_failure(output, &sequence, path, &failure)?;
-                    }
-                    Ok(ExistingOutputOutcome::Absent) => {
-                        let execution = execute_one(
-                            runtime,
-                            Arc::clone(&plan),
-                            cancel.clone(),
-                            output,
-                            Arc::clone(&sequence),
-                        )
-                        .await;
-                        match execution {
-                            Ok(report) => {
-                                results.push(json!({
-                                    "path": PathDto::new(path),
-                                    "output": PathDto::new(report.output()),
-                                    "status": "success",
-                                    "elapsed_us": report.backend().elapsed().as_micros(),
-                                    "warnings": report.warnings(),
-                                }));
-                                emit_file_success(output, &sequence, path, "converted")?;
-                            }
-                            Err(error) if error.code == 130 => return Err(error),
-                            Err(error) => {
-                                failures += 1;
-                                only_failure_code = error.code;
-                                results.push(error_value(path, &error));
-                                emit_file_failure(output, &sequence, path, &error)?;
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        if is_cancelled(&error) {
-                            return Err(CliFailure::new(130, error.to_string()));
-                        }
-                        failures += 1;
-                        only_failure_code = 6;
-                        let failure = runtime_failure(error, 6);
-                        results.push(error_value(path, &failure));
-                        emit_file_failure(output, &sequence, path, &failure)?;
-                    }
-                }
+            Err(broadcast::error::RecvError::Closed) => break,
+        }
+    }
+    if let Some(multi) = multi {
+        let _cleared = multi.clear();
+    }
+    Ok(())
+}
+
+fn emit_scheduler_event(sequence: &Arc<AtomicU64>, event: &BatchEvent) -> Result<(), CliFailure> {
+    match event {
+        BatchEvent::BatchStarted {
+            total,
+            concurrency,
+            failure_policy,
+        } => emit_event(
+            sequence,
+            "batch_started",
+            json!({
+                "command": "convert",
+                "files": total,
+                "jobs": concurrency,
+                "failure_policy": failure_policy.as_str(),
+            }),
+        ),
+        BatchEvent::PreparationStarted => emit_event(sequence, "preparation_started", json!({})),
+        BatchEvent::FileStarted { id, path } => emit_event(
+            sequence,
+            "file_started",
+            json!({"job_id": id.get(), "path": PathDto::new(path)}),
+        ),
+        BatchEvent::FilePrepared { id, path, status } => emit_event(
+            sequence,
+            "file_prepared",
+            json!({
+                "job_id": id.get(),
+                "path": PathDto::new(path),
+                "status": status.as_str(),
+            }),
+        ),
+        BatchEvent::ExecutionStarted { ready } => {
+            emit_event(sequence, "execution_started", json!({"ready": ready}))
+        }
+        BatchEvent::FileProgress { id, path, progress } => emit_event(
+            sequence,
+            "progress",
+            json!({
+                "job_id": id.get(),
+                "path": PathDto::new(path),
+                "progress": ProgressDto::from(progress),
+            }),
+        ),
+        BatchEvent::FileFinished { id, path, status } => emit_event(
+            sequence,
+            "file_finished",
+            json!({
+                "job_id": id.get(),
+                "path": PathDto::new(path),
+                "status": status.as_str(),
+            }),
+        ),
+        BatchEvent::BatchFinished | BatchEvent::BatchCancelled => Ok(()),
+        _ => Ok(()),
+    }
+}
+
+fn render_batch_snapshot(
+    multi: &MultiProgress,
+    snapshot: &BatchSnapshot,
+    preparation: &mut Option<ProgressBar>,
+    aggregate: &mut Option<ProgressBar>,
+    file_bars: &mut std::collections::HashMap<usize, ProgressBar>,
+) {
+    if preparation.is_none() {
+        let bar = multi.add(ProgressBar::new(snapshot.total() as u64));
+        bar.set_style(
+            ProgressStyle::with_template("{spinner:.green} Analyzing {pos}/{len}")
+                .unwrap_or_else(|_| ProgressStyle::default_bar()),
+        );
+        *preparation = Some(bar);
+    }
+    if let Some(bar) = preparation {
+        bar.set_position(snapshot.prepared() as u64);
+        if snapshot.stage() != sonicmux_runtime::BatchStage::Preparing {
+            bar.finish_and_clear();
+        }
+    }
+    if snapshot.stage() == sonicmux_runtime::BatchStage::Executing {
+        if aggregate.is_none() {
+            let bar = multi.add(ProgressBar::new(1_000));
+            bar.set_style(
+                ProgressStyle::with_template(
+                    "{spinner:.green} Overall {bar:36.cyan/blue} {pos:>4}/1000 {wide_msg}",
+                )
+                .unwrap_or_else(|_| ProgressStyle::default_bar()),
+            );
+            *aggregate = Some(bar);
+        }
+        if let Some(bar) = aggregate {
+            if let Some(position) = snapshot.progress_milli() {
+                bar.set_position(u64::from(position));
             }
-            Err(error) if error.code == 130 => return Err(error),
-            Err(error) => {
-                failures += 1;
-                only_failure_code = error.code;
-                results.push(error_value(path, &error));
-                emit_file_failure(output, &sequence, path, &error)?;
+            bar.set_message(snapshot.eta().map_or_else(
+                || "ETA unknown".to_owned(),
+                |eta| format!("ETA ~{}", human_duration(eta)),
+            ));
+        }
+    }
+    for file in snapshot.files() {
+        if file.status() == FileStatus::Running && !file_bars.contains_key(&file.id().get()) {
+            let bar = file.duration_us().map_or_else(
+                || multi.add(ProgressBar::new_spinner()),
+                |duration| multi.add(ProgressBar::new(duration)),
+            );
+            bar.set_style(
+                ProgressStyle::with_template(
+                    "{spinner:.green} {wide_msg} {bar:28.cyan/blue} {percent}%",
+                )
+                .unwrap_or_else(|_| ProgressStyle::default_bar()),
+            );
+            file_bars.insert(file.id().get(), bar);
+        }
+        if let Some(bar) = file_bars.get(&file.id().get()) {
+            if let Some(position) = file.position_us() {
+                bar.set_position(position);
+            }
+            let eta = file.eta().map_or_else(String::new, |value| {
+                format!(" · ETA ~{}", human_duration(value))
+            });
+            bar.set_message(format!("{}{}", file.path().display(), eta));
+        }
+        if file.status().is_terminal() {
+            if let Some(bar) = file_bars.remove(&file.id().get()) {
+                bar.finish_and_clear();
             }
         }
     }
-    let code = batch_code(files.len(), failures, only_failure_code);
+}
+
+fn batch_snapshot_value(snapshot: &BatchSnapshot) -> Value {
+    json!({
+        "stage": snapshot.stage().as_str(),
+        "total": snapshot.total(),
+        "prepared": snapshot.prepared(),
+        "active": snapshot.active(),
+        "queued": snapshot.queued(),
+        "completed": snapshot.completed(),
+        "progress_milli": snapshot.progress_milli(),
+        "eta_ms": snapshot.eta().map(|value| value.as_millis()),
+    })
+}
+
+fn human_duration(duration: std::time::Duration) -> String {
+    let seconds = duration.as_secs();
+    let hours = seconds / 3_600;
+    let minutes = (seconds % 3_600) / 60;
+    let seconds = seconds % 60;
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes}:{seconds:02}")
+    }
+}
+
+fn finish_convert_report(
+    report: &BatchReport,
+    output: OutputMode,
+    sequence: &Arc<AtomicU64>,
+) -> Result<u8, CliFailure> {
+    let mut results = Vec::with_capacity(report.results().len());
+    let mut failures = 0;
+    let mut only_failure_code = 6;
+    for result in report.results() {
+        let path = result.input();
+        match result.outcome() {
+            FileOutcome::Succeeded(job) => {
+                results.push(json!({
+                    "path": PathDto::new(path),
+                    "output": PathDto::new(job.output()),
+                    "status": "success",
+                    "elapsed_us": job.backend().elapsed().as_micros(),
+                    "warnings": job.warnings(),
+                }));
+                emit_file_success(output, sequence, path, "converted")?;
+            }
+            FileOutcome::Skipped(reason) => {
+                results.push(json!({
+                    "path": PathDto::new(path),
+                    "status": "skipped",
+                    "reason": reason.as_str(),
+                }));
+                emit_file_success(output, sequence, path, reason.as_str())?;
+            }
+            FileOutcome::Planned(dry_run) => {
+                let state = existing_state(dry_run.existing());
+                let plan = PlanDto::from(dry_run.plan());
+                results.push(json!({
+                    "status": "dry-run",
+                    "existing_output": state,
+                    "plan": plan,
+                }));
+                if output.json_progress {
+                    emit_event(
+                        sequence,
+                        "file_succeeded",
+                        json!({
+                            "job_id": result.id().get(),
+                            "status": "dry-run",
+                            "existing_output": state,
+                            "plan": plan,
+                        }),
+                    )?;
+                } else if !output.json && !output.quiet {
+                    write_human(&dry_run_text(dry_run), output.color)?;
+                }
+            }
+            FileOutcome::Failed(failure) => {
+                failures += 1;
+                only_failure_code = failure.stage().exit_code();
+                let error = CliFailure::new(only_failure_code, failure.message());
+                results.push(error_value(path, &error));
+                emit_file_failure(output, sequence, path, &error)?;
+            }
+            FileOutcome::Cancelled(reason) => {
+                results.push(json!({
+                    "path": PathDto::new(path),
+                    "status": "cancelled",
+                    "reason": reason.as_str(),
+                }));
+                if output.json_progress {
+                    emit_event(
+                        sequence,
+                        "file_cancelled",
+                        json!({
+                            "job_id": result.id().get(),
+                            "path": PathDto::new(path),
+                            "reason": reason.as_str(),
+                        }),
+                    )?;
+                } else if !output.json && !output.quiet {
+                    eprintln!("cancelled: {} ({})", path.display(), reason.as_str());
+                }
+            }
+            _ => {}
+        }
+    }
+    let code = if report.cancellation() == Some(CancellationReason::User) {
+        130
+    } else {
+        batch_code(report.results().len(), failures, only_failure_code)
+    };
     if output.json {
         emit_result("convert", status(code), json!({"files": results}))?;
     } else if output.json_progress {
         emit_event(
-            &sequence,
-            "batch_finished",
+            sequence,
+            if code == 130 {
+                "batch_cancelled"
+            } else {
+                "batch_finished"
+            },
             json!({"status": status(code), "exit_code": code}),
         )?;
     }
     Ok(code)
+}
+
+fn dry_run_text(report: &DryRunReport) -> String {
+    format!(
+        "dry-run: {}; existing output: {}",
+        human::plan(report.plan()),
+        existing_state(report.existing())
+    )
 }
 
 enum Analyzed {
@@ -727,65 +979,6 @@ fn resolve_selector(
             ),
         )),
     }
-}
-
-async fn execute_one(
-    runtime: &Runtime,
-    plan: Arc<JobPlan>,
-    cancel: CancellationToken,
-    output: OutputMode,
-    sequence: Arc<AtomicU64>,
-) -> Result<sonicmux_runtime::JobReport, CliFailure> {
-    let (sender, mut receiver) = mpsc::channel(32);
-    let duration = plan.duration().map(|value| value.get());
-    let visible = !output.json
-        && !output.json_progress
-        && !output.quiet
-        && io::stderr().is_terminal()
-        && std::env::var_os("TERM").is_none_or(|value| value != "dumb");
-    let progress = if visible {
-        let progress = duration.map_or_else(ProgressBar::new_spinner, ProgressBar::new);
-        progress.set_style(
-            ProgressStyle::with_template(
-                "{spinner:.green} {wide_msg} {bar:40.cyan/blue} {percent}%",
-            )
-            .unwrap_or_else(|_| ProgressStyle::default_bar()),
-        );
-        progress.set_message(plan.input().display().to_string());
-        Some(progress)
-    } else {
-        None
-    };
-    let progress_task = tokio::spawn(async move {
-        while let Some(event) = receiver.recv().await {
-            let snapshot = match event {
-                ProgressEvent::Started => None,
-                ProgressEvent::Advanced(value) | ProgressEvent::Finished(value) => Some(value),
-                _ => None,
-            };
-            if let (Some(bar), Some(snapshot)) = (&progress, snapshot.as_ref()) {
-                if let Some(position) = snapshot
-                    .out_time_us
-                    .and_then(|value| u64::try_from(value).ok())
-                {
-                    bar.set_position(duration.map_or(position, |maximum| position.min(maximum)));
-                }
-            }
-            if output.json_progress {
-                let payload = snapshot.as_ref().map_or_else(
-                    || json!({}),
-                    |value| json!({"progress": ProgressDto::from(value)}),
-                );
-                let _ignored = emit_event(&sequence, "progress", payload);
-            }
-        }
-        if let Some(bar) = progress {
-            bar.finish_and_clear();
-        }
-    });
-    let result = runtime.execute(plan, sender, cancel).await;
-    let _joined = progress_task.await;
-    result.map_err(|error| runtime_failure(error, 6))
 }
 
 async fn doctor_command(
@@ -912,6 +1105,8 @@ fn config_values(config: &EffectiveConfig, sources: bool) -> Value {
         "ffmpeg_path": config.ffmpeg_path.as_ref().map(|item| path_value(item, sources)),
         "output_directory": config.output_directory.as_ref().map(|item| path_value(item, sources)),
         "log_file": config.log_file.as_ref().map(|item| path_value(item, sources)),
+        "jobs": value(&config.jobs, sources),
+        "storage_profile": value(&config.storage_profile, sources),
     })
 }
 

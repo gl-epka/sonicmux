@@ -139,6 +139,18 @@ pub struct ConvertArgs {
     /// Probe and print plans without writing files.
     #[arg(long)]
     pub dry_run: bool,
+    /// Maximum files processed at once.
+    #[arg(long, value_name = "N", value_parser = parse_jobs)]
+    pub jobs: Option<usize>,
+    /// Storage concurrency profile.
+    #[arg(long, value_enum)]
+    pub storage_profile: Option<StorageProfileChoice>,
+    /// Continue the batch after a file fails (default).
+    #[arg(long, conflicts_with = "fail_fast")]
+    pub continue_on_error: bool,
+    /// Stop admission and cancel active files after the first failure.
+    #[arg(long, conflicts_with = "continue_on_error")]
+    pub fail_fast: bool,
 }
 
 /// Arguments for read-only scanning.
@@ -268,4 +280,34 @@ impl ColorChoice {
             Self::Never => "never",
         }
     }
+}
+
+/// Coarse storage intent for the scheduler default.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum StorageProfileChoice {
+    /// Rotational or seek-sensitive storage; defaults to one job.
+    Hdd,
+    /// Conservative general-purpose concurrency.
+    Balanced,
+    /// Explicit solid-state storage intent.
+    Nvme,
+}
+
+impl StorageProfileChoice {
+    /// Returns the stable configuration spelling.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Hdd => "hdd",
+            Self::Balanced => "balanced",
+            Self::Nvme => "nvme",
+        }
+    }
+}
+
+fn parse_jobs(value: &str) -> Result<usize, String> {
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|jobs| (1..=64).contains(jobs))
+        .ok_or_else(|| "expected an integer from 1 through 64".to_owned())
 }
