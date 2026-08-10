@@ -13,4 +13,20 @@ pub enum RuntimeError {
     /// The configured media backend failed.
     #[error(transparent)]
     Backend(#[from] sonicmux_backend::BackendError),
+
+    /// Pure media planning failed.
+    #[error(transparent)]
+    Plan(#[from] sonicmux_core::PlanError),
+
+    /// The safe output transaction failed.
+    #[error(transparent)]
+    Execution(#[from] crate::ExecutionError),
+
+    /// Inspecting a possible existing output failed.
+    #[error("failed to inspect existing output: {source}")]
+    InspectOutput {
+        /// Operating-system error.
+        #[source]
+        source: std::io::Error,
+    },
 }

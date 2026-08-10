@@ -1,0 +1,520 @@
+```console
+$ sonicmux --help
+Make MKV audio playable on TVs without re-encoding video.
+
+Usage: sonicmux [OPTIONS] <COMMAND>
+
+Commands:
+  probe        Inspect streams, chapters, attachments, and metadata
+  convert      Convert incompatible audio or remux existing compatible audio
+  scan         Find MKV files and show the actions they require
+  config       Inspect and manage configuration
+  presets      List and inspect device presets
+  doctor       Check FFmpeg and required codec capabilities
+  completions  Generate shell completion scripts
+  man          Generate a manual page
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --json
+          Write the final result as JSON to stdout
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+  -q, --quiet
+          Hide non-error human output
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+
+```
+
+```console
+$ sonicmux probe --help
+Inspect streams, chapters, attachments, and metadata
+
+Usage: sonicmux probe [OPTIONS] <INPUT>...
+
+Arguments:
+  <INPUT>...
+          MKV files to inspect
+
+Options:
+      --compact
+          Show one summary row per file
+
+      --config <PATH>
+          Use this TOML configuration file
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --json
+          Write the final result as JSON to stdout
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+  -q, --quiet
+          Hide non-error human output
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
+```console
+$ sonicmux convert --help
+Convert incompatible audio or remux existing compatible audio
+
+Usage: sonicmux convert [OPTIONS] <INPUT>...
+
+Arguments:
+  <INPUT>...
+          MKV files, directories, or glob patterns
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+      --profile <PROFILE>
+          Device profile
+
+      --codec <CODEC>
+          Target audio codec
+[..]
+          [possible values: ac3, eac3, aac]
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --bitrate <RATE>
+          Target bitrate, for example 640k
+
+      --json
+          Write the final result as JSON to stdout
+
+      --channels <CHANNELS>
+          Output layout
+[..]
+          [possible values: keep-up-to-5.1, stereo, 5.1]
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --mode <MODE>
+          Audio output mode
+[..]
+          [possible values: add, replace, only-new]
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -r, --recursive
+          Recurse into input directories
+
+      --include <GLOB>
+          Include matching relative paths
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+      --exclude <GLOB>
+          Exclude matching relative paths
+
+  -q, --quiet
+          Hide non-error human output
+
+      --follow-links
+          Follow symbolic links
+
+      --remux-only
+          Remux an existing compatible audio track without encoding
+
+      --default-audio <DEFAULT_AUDIO>
+          Track for remux: index, language, or first-compatible
+[..]
+          [default: first-compatible]
+
+  -o, --output <PATH>
+          Exact output path; requires one discovered input
+
+      --output-dir <DIR>
+          Put generated outputs in this existing directory
+
+      --dry-run
+          Probe and print plans without writing files
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
+```console
+$ sonicmux scan --help
+Find MKV files and show the actions they require
+
+Usage: sonicmux scan [OPTIONS] <PATH>...
+
+Arguments:
+  <PATH>...
+          MKV files, directories, or glob patterns
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+      --profile <PROFILE>
+          Device profile
+
+      --codec <CODEC>
+          Target audio codec
+[..]
+          [possible values: ac3, eac3, aac]
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --bitrate <RATE>
+          Target bitrate, for example 640k
+
+      --json
+          Write the final result as JSON to stdout
+
+      --channels <CHANNELS>
+          Output layout
+[..]
+          [possible values: keep-up-to-5.1, stereo, 5.1]
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --mode <MODE>
+          Audio output mode
+[..]
+          [possible values: add, replace, only-new]
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -r, --recursive
+          Recurse into input directories
+
+      --include <GLOB>
+          Include matching relative paths
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+      --exclude <GLOB>
+          Exclude matching relative paths
+
+  -q, --quiet
+          Hide non-error human output
+
+      --follow-links
+          Follow symbolic links
+
+      --needs-action
+          Show only files that need work
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
+```console
+$ sonicmux config --help
+Inspect and manage configuration
+
+Usage: sonicmux config [OPTIONS] <COMMAND>
+
+Commands:
+  show      Print the effective merged configuration
+  path      Print the active configuration path
+  init      Write a documented starter configuration without replacing a file
+  validate  Validate the selected configuration file
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --json
+          Write the final result as JSON to stdout
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+  -q, --quiet
+          Hide non-error human output
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
+```console
+$ sonicmux presets --help
+List and inspect device presets
+
+Usage: sonicmux presets [OPTIONS] <COMMAND>
+
+Commands:
+  list  List built-in and configured presets
+  show  Show compatibility rules for one preset
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --json
+          Write the final result as JSON to stdout
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+  -q, --quiet
+          Hide non-error human output
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
+```console
+$ sonicmux doctor --help
+Check FFmpeg and required codec capabilities
+
+Usage: sonicmux doctor [OPTIONS]
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+      --profile <PROFILE>
+          Device profile to check
+
+      --codec <CODEC>
+          Target encoder to check
+[..]
+          [possible values: ac3, eac3, aac]
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --json
+          Write the final result as JSON to stdout
+
+      --print-paths
+          Always include executable paths in human output
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+  -q, --quiet
+          Hide non-error human output
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
+```console
+$ sonicmux completions --help
+Generate shell completion scripts
+
+Usage: sonicmux completions [OPTIONS] <SHELL>
+
+Arguments:
+  <SHELL>
+          Target shell
+
+          Possible values:
+          - bash:       Bash
+          - elvish:     Elvish
+          - fish:       Fish
+          - powershell: PowerShell
+          - zsh:        Zsh
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --json
+          Write the final result as JSON to stdout
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+  -q, --quiet
+          Hide non-error human output
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
+```console
+$ sonicmux man --help
+Generate a manual page
+
+Usage: sonicmux man [OPTIONS]
+
+Options:
+      --config <PATH>
+          Use this TOML configuration file
+
+  -o, --output <PATH>
+          Write ROFF to a new file instead of stdout
+
+      --ffmpeg-path <PATH>
+          Use this FFmpeg executable or installation directory
+
+      --json
+          Write the final result as JSON to stdout
+
+      --json-progress
+          Write versioned NDJSON events to stdout
+
+      --color <COLOR>
+          Color output
+
+          Possible values:
+          - auto:   Detect terminal support and `NO_COLOR`
+          - always: Always emit terminal color
+          - never:  Never emit terminal color
+
+      --log-file <PATH>
+          Also write structured diagnostic logs to a file
+
+  -v, --verbose...
+          Increase diagnostic verbosity
+
+  -q, --quiet
+          Hide non-error human output
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```

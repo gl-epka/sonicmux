@@ -1,0 +1,19 @@
+{
+  "schema": "sonicmux.result",
+  "version": 1,
+  "command": "config",
+  "status": "success",
+  "data": {
+    "configuration": {
+      "profile": "generic-tv",
+      "codec": "ac3",
+      "bitrate": "640k",
+      "channels": "keep-up-to-5.1",
+      "mode": "add",
+      "color": "auto",
+      "ffmpeg_path": null,
+      "output_directory": null,
+      "log_file": null
+    }
+  }
+}
