@@ -1,0 +1,7 @@
+---
+source: crates/core/src/plan.rs
+expression: "build(&media(&[ac3(true)]),\n&policy(OutputMode::OnlyNew, RequestedAction::Convert))"
+---
+Err(
+    NothingToDo,
+)

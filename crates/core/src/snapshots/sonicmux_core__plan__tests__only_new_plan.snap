@@ -1,0 +1,155 @@
+---
+source: crates/core/src/plan.rs
+expression: "build(&media(&[ac3(true), dts(false)]),\n&policy(OutputMode::OnlyNew, RequestedAction::Convert))"
+---
+Ok(
+    Execute(
+        JobPlan {
+            input: "movie.mkv",
+            output: "movie.sonicmux.mkv",
+            action: Transcode,
+            streams: [
+                Copy {
+                    source: StreamIndex(
+                        0,
+                    ),
+                    dispositions: Dispositions {
+                        default: false,
+                        dub: false,
+                        original: false,
+                        comment: false,
+                        lyrics: false,
+                        karaoke: false,
+                        forced: false,
+                        hearing_impaired: false,
+                        visual_impaired: false,
+                        clean_effects: false,
+                        attached_pic: false,
+                        timed_thumbnails: false,
+                        captions: false,
+                        descriptions: false,
+                        metadata: false,
+                        dependent: false,
+                        still_image: false,
+                        other: {},
+                    },
+                },
+                EncodeAudio {
+                    source: StreamIndex(
+                        2,
+                    ),
+                    target: Ac3 {
+                        bitrate: Ac3Bitrate(
+                            640000,
+                        ),
+                        layout: KeepUpTo51,
+                    },
+                    metadata: MetadataPlan {
+                        metadata: Metadata(
+                            {
+                                "language": "eng",
+                                "title": "Main [AC-3 5.1]",
+                            },
+                        ),
+                    },
+                    dispositions: Dispositions {
+                        default: false,
+                        dub: false,
+                        original: false,
+                        comment: false,
+                        lyrics: false,
+                        karaoke: false,
+                        forced: true,
+                        hearing_impaired: false,
+                        visual_impaired: false,
+                        clean_effects: false,
+                        attached_pic: false,
+                        timed_thumbnails: false,
+                        captions: false,
+                        descriptions: false,
+                        metadata: false,
+                        dependent: false,
+                        still_image: false,
+                        other: {},
+                    },
+                },
+            ],
+            copy_chapters: true,
+            copy_global_metadata: true,
+            warnings: [],
+            expected: OutputExpectations {
+                streams: [
+                    ExpectedStream {
+                        source: StreamIndex(
+                            0,
+                        ),
+                        codec: Copied(
+                            "hevc",
+                        ),
+                        metadata: Metadata(
+                            {},
+                        ),
+                        dispositions: Dispositions {
+                            default: false,
+                            dub: false,
+                            original: false,
+                            comment: false,
+                            lyrics: false,
+                            karaoke: false,
+                            forced: false,
+                            hearing_impaired: false,
+                            visual_impaired: false,
+                            clean_effects: false,
+                            attached_pic: false,
+                            timed_thumbnails: false,
+                            captions: false,
+                            descriptions: false,
+                            metadata: false,
+                            dependent: false,
+                            still_image: false,
+                            other: {},
+                        },
+                    },
+                    ExpectedStream {
+                        source: StreamIndex(
+                            2,
+                        ),
+                        codec: Encoded(
+                            "AC-3",
+                        ),
+                        metadata: Metadata(
+                            {
+                                "language": "eng",
+                                "title": "Main [AC-3 5.1]",
+                            },
+                        ),
+                        dispositions: Dispositions {
+                            default: false,
+                            dub: false,
+                            original: false,
+                            comment: false,
+                            lyrics: false,
+                            karaoke: false,
+                            forced: true,
+                            hearing_impaired: false,
+                            visual_impaired: false,
+                            clean_effects: false,
+                            attached_pic: false,
+                            timed_thumbnails: false,
+                            captions: false,
+                            descriptions: false,
+                            metadata: false,
+                            dependent: false,
+                            still_image: false,
+                            other: {},
+                        },
+                    },
+                ],
+                chapters: [],
+                global_metadata: Metadata(
+                    {},
+                ),
+            },
+        },
+    ),
+)
