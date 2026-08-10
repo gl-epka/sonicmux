@@ -222,6 +222,11 @@ impl CompatibilityPolicy {
         self.unknown_codec
     }
 
+    /// Iterates codec rules in stable family order.
+    pub fn rules(&self) -> impl Iterator<Item = (AudioCodecFamily, &CodecRule)> {
+        self.rules.iter().map(|(family, rule)| (*family, rule))
+    }
+
     /// Classifies one audio stream.
     ///
     /// # Errors
@@ -264,6 +269,26 @@ impl CompatibilityPolicy {
             Some(reasons) => Compatibility::Incompatible(reasons),
             None => Compatibility::Compatible,
         })
+    }
+}
+
+impl AudioCodecFamily {
+    /// Returns the stable configuration spelling for this family.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Ac3 => "ac3",
+            Self::Eac3 => "eac3",
+            Self::Aac => "aac",
+            Self::Mp3 => "mp3",
+            Self::Dts => "dts",
+            Self::TrueHd => "truehd",
+            Self::Flac => "flac",
+            Self::Opus => "opus",
+            Self::Vorbis => "vorbis",
+            Self::Pcm => "pcm",
+            Self::Other => "other",
+        }
     }
 }
 

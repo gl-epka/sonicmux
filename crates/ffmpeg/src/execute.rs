@@ -5,7 +5,8 @@ use std::{io, path::PathBuf, process::Stdio, time::Instant};
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup as _, AsyncGroupChild};
 use sonicmux_backend::{
-    BackendError, BackendExecution, BackendReport, MediaBackend, ProgressEvent,
+    BackendCapabilities, BackendError, BackendExecution, BackendReport, CapabilityRequest,
+    MediaBackend, ProgressEvent,
 };
 use sonicmux_core::MediaInfo;
 use thiserror::Error;
@@ -308,5 +309,13 @@ impl MediaBackend for FfmpegCliBackend {
                     source: Box::new(source),
                 },
             })
+    }
+
+    async fn capabilities(
+        &self,
+        request: CapabilityRequest,
+        cancel: CancellationToken,
+    ) -> Result<BackendCapabilities, BackendError> {
+        self.inspect_capabilities(request, cancel).await
     }
 }

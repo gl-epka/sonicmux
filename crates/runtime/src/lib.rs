@@ -1,10 +1,16 @@
 #![doc = "Application runtime, scheduling, and observability for SonicMux."]
 #![forbid(unsafe_code)]
 
+pub mod application;
+pub mod config;
+pub mod discovery;
 pub mod error;
 pub mod execution;
 pub mod observability;
 
+pub use application::{ExistingOutputOutcome, Runtime};
+pub use config::*;
+pub use discovery::*;
 pub use error::RuntimeError;
 pub use execution::{
     ExecutionError, JobReport, ValidationMismatch, ValidationReport, execute_safely,

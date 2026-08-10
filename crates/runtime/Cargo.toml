@@ -8,15 +8,22 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+directories.workspace = true
+glob.workspace = true
+globset.workspace = true
 renamore.workspace = true
+serde.workspace = true
 sonicmux-backend.workspace = true
 sonicmux-core.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
+toml.workspace = true
 tracing.workspace = true
+tracing-appender.workspace = true
 tracing-subscriber.workspace = true
+walkdir.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
