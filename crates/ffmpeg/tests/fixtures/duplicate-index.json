@@ -1,0 +1,7 @@
+{
+  "streams": [
+    { "index": 0, "codec_name": "hevc", "codec_type": "video" },
+    { "index": 0, "codec_name": "ac3", "codec_type": "audio", "channels": 2 }
+  ],
+  "format": { "format_name": "matroska" }
+}

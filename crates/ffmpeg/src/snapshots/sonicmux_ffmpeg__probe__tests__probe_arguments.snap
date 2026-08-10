@@ -1,0 +1,14 @@
+---
+source: crates/ffmpeg/src/probe.rs
+expression: "FfmpegCliBackend::probe_arguments(PathBuf::from(\"<INPUT>\").as_path())"
+---
+[
+    "-v",
+    "error",
+    "-of",
+    "json",
+    "-show_streams",
+    "-show_format",
+    "-show_chapters",
+    "<INPUT>",
+]

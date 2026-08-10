@@ -1,0 +1,325 @@
+---
+source: crates/ffmpeg/src/probe.rs
+expression: media
+---
+MediaInfo {
+    path: "<INPUT>",
+    format: FormatInfo {
+        names: [
+            "matroska",
+            "webm",
+        ],
+        duration: Some(
+            DurationMicros(
+                120000000,
+            ),
+        ),
+        start_time: Some(
+            -21000,
+        ),
+        bitrate: Some(
+            Bitrate(
+                20000000,
+            ),
+        ),
+        metadata: Metadata(
+            {
+                "title": "Fixture",
+            },
+        ),
+    },
+    streams: [
+        Video(
+            VideoStream {
+                common: StreamCommon {
+                    index: StreamIndex(
+                        0,
+                    ),
+                    codec_name: "hevc",
+                    codec_profile: None,
+                    bitrate: None,
+                    timing: StreamTiming {
+                        start: Some(
+                            MediaTimestamp {
+                                ticks: 0,
+                                time_base: TimeBase {
+                                    numerator: 1,
+                                    denominator: 1000,
+                                },
+                            },
+                        ),
+                        duration_ticks: Some(
+                            120000,
+                        ),
+                    },
+                    metadata: Metadata(
+                        {},
+                    ),
+                    dispositions: Dispositions {
+                        default: true,
+                        dub: false,
+                        original: false,
+                        comment: false,
+                        lyrics: false,
+                        karaoke: false,
+                        forced: false,
+                        hearing_impaired: false,
+                        visual_impaired: false,
+                        clean_effects: false,
+                        attached_pic: false,
+                        timed_thumbnails: false,
+                        captions: false,
+                        descriptions: false,
+                        metadata: false,
+                        dependent: false,
+                        still_image: false,
+                        other: {},
+                    },
+                },
+            },
+        ),
+        Audio(
+            AudioStream {
+                common: StreamCommon {
+                    index: StreamIndex(
+                        1,
+                    ),
+                    codec_name: "dts",
+                    codec_profile: Some(
+                        "DTS-HD MA",
+                    ),
+                    bitrate: Some(
+                        Bitrate(
+                            1536000,
+                        ),
+                    ),
+                    timing: StreamTiming {
+                        start: Some(
+                            MediaTimestamp {
+                                ticks: -21,
+                                time_base: TimeBase {
+                                    numerator: 1,
+                                    denominator: 1000,
+                                },
+                            },
+                        ),
+                        duration_ticks: Some(
+                            120000,
+                        ),
+                    },
+                    metadata: Metadata(
+                        {
+                            "language": "eng",
+                            "title": "Main",
+                        },
+                    ),
+                    dispositions: Dispositions {
+                        default: true,
+                        dub: false,
+                        original: false,
+                        comment: false,
+                        lyrics: false,
+                        karaoke: false,
+                        forced: false,
+                        hearing_impaired: false,
+                        visual_impaired: false,
+                        clean_effects: false,
+                        attached_pic: false,
+                        timed_thumbnails: false,
+                        captions: false,
+                        descriptions: false,
+                        metadata: false,
+                        dependent: false,
+                        still_image: false,
+                        other: {
+                            "future_flag": true,
+                        },
+                    },
+                },
+                codec: Dts(
+                    HdMasterAudio,
+                ),
+                channels: Channels {
+                    count: ChannelCount(
+                        6,
+                    ),
+                    layout_name: Some(
+                        "5.1(side)",
+                    ),
+                },
+                sample_rate: Some(
+                    SampleRate(
+                        48000,
+                    ),
+                ),
+            },
+        ),
+        Audio(
+            AudioStream {
+                common: StreamCommon {
+                    index: StreamIndex(
+                        2,
+                    ),
+                    codec_name: "ac3",
+                    codec_profile: None,
+                    bitrate: Some(
+                        Bitrate(
+                            192000,
+                        ),
+                    ),
+                    timing: StreamTiming {
+                        start: None,
+                        duration_ticks: None,
+                    },
+                    metadata: Metadata(
+                        {
+                            "language": "rus",
+                            "title": "Dub",
+                        },
+                    ),
+                    dispositions: Dispositions {
+                        default: false,
+                        dub: false,
+                        original: false,
+                        comment: false,
+                        lyrics: false,
+                        karaoke: false,
+                        forced: false,
+                        hearing_impaired: false,
+                        visual_impaired: false,
+                        clean_effects: false,
+                        attached_pic: false,
+                        timed_thumbnails: false,
+                        captions: false,
+                        descriptions: false,
+                        metadata: false,
+                        dependent: false,
+                        still_image: false,
+                        other: {},
+                    },
+                },
+                codec: Ac3,
+                channels: Channels {
+                    count: ChannelCount(
+                        2,
+                    ),
+                    layout_name: Some(
+                        "stereo",
+                    ),
+                },
+                sample_rate: Some(
+                    SampleRate(
+                        48000,
+                    ),
+                ),
+            },
+        ),
+        Subtitle(
+            SubtitleStream {
+                common: StreamCommon {
+                    index: StreamIndex(
+                        3,
+                    ),
+                    codec_name: "ass",
+                    codec_profile: None,
+                    bitrate: None,
+                    timing: StreamTiming {
+                        start: None,
+                        duration_ticks: None,
+                    },
+                    metadata: Metadata(
+                        {
+                            "language": "eng",
+                            "title": "Signs",
+                        },
+                    ),
+                    dispositions: Dispositions {
+                        default: false,
+                        dub: false,
+                        original: false,
+                        comment: false,
+                        lyrics: false,
+                        karaoke: false,
+                        forced: true,
+                        hearing_impaired: false,
+                        visual_impaired: false,
+                        clean_effects: false,
+                        attached_pic: false,
+                        timed_thumbnails: false,
+                        captions: false,
+                        descriptions: false,
+                        metadata: false,
+                        dependent: false,
+                        still_image: false,
+                        other: {},
+                    },
+                },
+            },
+        ),
+        Attachment(
+            AttachmentStream {
+                common: StreamCommon {
+                    index: StreamIndex(
+                        4,
+                    ),
+                    codec_name: "ttf",
+                    codec_profile: None,
+                    bitrate: None,
+                    timing: StreamTiming {
+                        start: None,
+                        duration_ticks: None,
+                    },
+                    metadata: Metadata(
+                        {
+                            "filename": "Font.ttf",
+                            "mimetype": "font/ttf",
+                        },
+                    ),
+                    dispositions: Dispositions {
+                        default: false,
+                        dub: false,
+                        original: false,
+                        comment: false,
+                        lyrics: false,
+                        karaoke: false,
+                        forced: false,
+                        hearing_impaired: false,
+                        visual_impaired: false,
+                        clean_effects: false,
+                        attached_pic: false,
+                        timed_thumbnails: false,
+                        captions: false,
+                        descriptions: false,
+                        metadata: false,
+                        dependent: false,
+                        still_image: false,
+                        other: {},
+                    },
+                },
+                filename: Some(
+                    "Font.ttf",
+                ),
+                mime_type: Some(
+                    "font/ttf",
+                ),
+            },
+        ),
+    ],
+    chapters: [
+        Chapter {
+            id: 0,
+            time_base: TimeBase {
+                numerator: 1,
+                denominator: 1000000000,
+            },
+            start: 0,
+            end: 60000000000,
+            metadata: Metadata(
+                {
+                    "title": "Chapter 1",
+                },
+            ),
+        },
+    ],
+    warnings: [],
+}

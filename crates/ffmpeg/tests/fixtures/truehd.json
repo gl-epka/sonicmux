@@ -1,0 +1,19 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "truehd",
+      "codec_type": "audio",
+      "sample_rate": "48000",
+      "channels": 8,
+      "channel_layout": "7.1",
+      "tags": { "language": "eng" },
+      "disposition": { "default": 1 }
+    }
+  ],
+  "chapters": [],
+  "format": {
+    "format_name": "matroska,webm",
+    "duration": "5.000000"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "hevc",
+      "codec_type": "video",
+      "time_base": "1/1000",
+      "start_pts": 0,
+      "duration_ts": 120000,
+      "disposition": { "default": 1 }
+    },
+    {
+      "index": 1,
+      "codec_name": "dts",
+      "codec_type": "audio",
+      "profile": "DTS-HD MA",
+      "sample_rate": "48000",
+      "channels": 6,
+      "channel_layout": "5.1(side)",
+      "bit_rate": "1536000",
+      "time_base": "1/1000",
+      "start_pts": -21,
+      "duration_ts": 120000,
+      "tags": { "language": "eng", "title": "Main" },
+      "disposition": { "default": 1, "forced": 0, "future_flag": 1 }
+    },
+    {
+      "index": 2,
+      "codec_name": "ac3",
+      "codec_type": "audio",
+      "sample_rate": "48000",
+      "channels": 2,
+      "channel_layout": "stereo",
+      "bit_rate": "192000",
+      "tags": { "language": "rus", "title": "Dub" },
+      "disposition": { "default": 0 }
+    },
+    {
+      "index": 3,
+      "codec_name": "ass",
+      "codec_type": "subtitle",
+      "tags": { "language": "eng", "title": "Signs" },
+      "disposition": { "default": 0, "forced": 1 }
+    },
+    {
+      "index": 4,
+      "codec_name": "ttf",
+      "codec_type": "attachment",
+      "tags": { "filename": "Font.ttf", "mimetype": "font/ttf" },
+      "disposition": {}
+    }
+  ],
+  "chapters": [
+    {
+      "id": 0,
+      "time_base": "1/1000000000",
+      "start": 0,
+      "end": 60000000000,
+      "tags": { "title": "Chapter 1" }
+    }
+  ],
+  "format": {
+    "format_name": "matroska,webm",
+    "start_time": "-0.021000",
+    "duration": "120.000000",
+    "bit_rate": "20000000",
+    "tags": { "title": "Fixture" }
+  },
+  "future_top_level": true
+}

@@ -2,8 +2,10 @@
 #![forbid(unsafe_code)]
 
 pub mod error;
+pub mod probe;
 
 pub use error::BackendError;
+pub use probe::{FfmpegCliBackend, ProbeError, parse_probe_output};
 
 /// The package name, exposed for workspace smoke tests and diagnostics.
 pub const CRATE_NAME: &str = env!("CARGO_PKG_NAME");
