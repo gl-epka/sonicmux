@@ -7,6 +7,7 @@ pub mod discovery;
 pub mod error;
 pub mod execution;
 pub mod observability;
+pub mod scheduler;
 
 pub use application::{ExistingOutputOutcome, Runtime};
 pub use config::*;
@@ -16,6 +17,7 @@ pub use execution::{
     ExecutionError, JobReport, ValidationMismatch, ValidationReport, execute_safely,
     validate_output,
 };
+pub use scheduler::*;
 
 /// The package name, exposed for workspace smoke tests and diagnostics.
 pub const CRATE_NAME: &str = env!("CARGO_PKG_NAME");

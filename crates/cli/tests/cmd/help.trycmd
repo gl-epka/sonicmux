@@ -191,6 +191,23 @@ Options:
       --dry-run
           Probe and print plans without writing files
 
+      --jobs <N>
+          Maximum files processed at once
+
+      --storage-profile <STORAGE_PROFILE>
+          Storage concurrency profile
+
+          Possible values:
+          - hdd:      Rotational or seek-sensitive storage; defaults to one job
+          - balanced: Conservative general-purpose concurrency
+          - nvme:     Explicit solid-state storage intent
+
+      --continue-on-error
+          Continue the batch after a file fails (default)
+
+      --fail-fast
+          Stop admission and cancel active files after the first failure
+
   -h, --help
           Print help (see a summary with '-h')
 

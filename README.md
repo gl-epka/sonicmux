@@ -5,8 +5,8 @@ re-encoding video. It preserves original streams, metadata, chapters, and
 attachments while changing only audio tracks that a selected device profile
 cannot play. Remux-only mode can instead make a compatible track the default.
 
-M4 provides the complete sequential command-line application. Parallel batch
-scheduling, the TUI, and the desktop GUI are later milestones.
+M5 provides the complete command-line application with bounded parallel batch
+scheduling. The TUI and desktop GUI are later milestones.
 
 ## Problem → solution
 
@@ -50,6 +50,9 @@ sonicmux convert movie.mkv --dry-run
 # Keep original audio and append compatible derivatives
 sonicmux convert movie.mkv
 
+# Convert a folder with up to four active files
+sonicmux convert ./movies --recursive --jobs 4
+
 # Make existing compatible English audio the default without encoding
 sonicmux convert movie.mkv --remux-only --default-audio eng
 
@@ -70,10 +73,28 @@ SonicMux accepts only Matroska `.mkv` inputs until the media core is stable. A
 conversion is written into a private sibling staging directory, probed and
 validated, synchronized, and then published with a non-replacing atomic rename.
 An existing valid result is skipped. A conflicting result is never deleted or
-overwritten. M4 intentionally has no `--overwrite` or `--in-place` option.
+overwritten. SonicMux intentionally has no `--overwrite` or `--in-place` option.
 
 `--dry-run` performs discovery, probing, compatibility checks, planning, and
 existing-output inspection without creating output files or directories.
+
+## Parallel batches
+
+`convert` first probes and plans inputs with bounded concurrency, checks for
+duplicate destinations, and then executes ready files with the same bound. The
+default is half the available logical CPUs, clamped to 1–4. Override it with
+`--jobs N`, `SONICMUX_JOBS`, or `[scheduler].jobs`.
+
+Storage profiles provide conservative defaults when no explicit job count wins:
+
+- `hdd`: one active file;
+- `balanced`: computed 1–4 default;
+- `nvme`: computed 1–4 default and an explicit SSD intent marker.
+
+One file failure does not stop unrelated work. `--fail-fast` instead stops new
+admission and cancels active files, waiting for FFmpeg process groups and private
+staging files to be cleaned. Final JSON results always retain discovery order,
+even when files finish out of order.
 
 ## Configuration and automation
 
@@ -83,6 +104,14 @@ Configuration is strict, versioned TOML. Precedence is command line,
 ```console
 sonicmux config init
 sonicmux config show --sources
+```
+
+The generated file includes:
+
+```toml
+[scheduler]
+# jobs = 2
+storage-profile = "balanced"
 ```
 
 `--json` produces one versioned result document. `--json-progress` produces
@@ -101,13 +130,35 @@ documented in [docs/cli.md](docs/cli.md).
 | 6 | Execution, validation, or safe publication failure |
 | 130 | Cancelled after process reaping and staging cleanup |
 
+## M5 benchmark
+
+This is a local synthetic measurement, not a universal speed claim. Four copies
+of one generated 20-second MKV were converted from six-channel DTS to AC-3 in
+`add` mode. Each input was 35,975,929 bytes (MPEG-4 video, DTS audio), for
+143,903,716 input bytes per batch.
+
+| Jobs | Mean ± σ | Range | Relative |
+| ---: | ---: | ---: | ---: |
+| 1 | 937.7 ± 30.9 ms | 910.2–986.2 ms | baseline |
+| 4 | 295.8 ± 26.9 ms | 261.2–330.2 ms | 3.17× faster in this run |
+
+Measurement environment: release build at commit `6e34c65`, Apple M2 (8 cores),
+8 GiB RAM, arm64 macOS 26.5.2, internal Apple SSD with APFS, FFmpeg 8.1.1, and
+hyperfine 1.20.0. Hyperfine used one warmup and five measured runs; output files
+were removed before every command. Fixture SHA-256:
+`6278babeb8cca952a6632319d31659ab302d1df45eb0231231c2435dbbf092cf`.
+An HDD result was not measured and is not inferred from the SSD result.
+
+Reproduce the synthetic fixture and benchmark with
+`benchmarks/generate-m5-fixture.sh` and `benchmarks/run-m5.sh`. The runner keeps
+its temporary workspace so the measured inputs, outputs, and JSON results can be
+inspected.
+
 ## Current limitations
 
 - MKV input/output only;
-- sequential file processing until M5;
 - system FFmpeg for CLI/TUI delivery;
-- no replacing transaction, TUI, GUI, release binaries, benchmarks, or demo
-  media yet.
+- no replacing transaction, TUI, GUI, release binaries, or recorded demo yet.
 
 ## License
 

@@ -1,6 +1,6 @@
 //! Strict versioned configuration loading and precedence merging.
 
-use std::{collections::BTreeMap, env, fs, io, path::PathBuf};
+use std::{collections::BTreeMap, env, fs, io, path::PathBuf, thread};
 
 use directories::ProjectDirs;
 use serde::Deserialize;
@@ -11,6 +11,7 @@ use sonicmux_core::{
 use thiserror::Error;
 
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
+const MAX_SCHEDULER_JOBS: usize = 64;
 const BUILTIN_PROFILES: &[&str] = &["generic-tv", "samsung", "lg", "dlna"];
 
 /// Origin of one effective configuration value.
@@ -83,6 +84,10 @@ pub struct PartialConfig {
     pub color: Option<String>,
     /// Structured diagnostic log file.
     pub log_file: Option<PathBuf>,
+    /// Maximum concurrently processed files.
+    pub jobs: Option<usize>,
+    /// Storage concurrency profile spelling.
+    pub storage_profile: Option<String>,
     custom_profiles: BTreeMap<String, ProfileFile>,
 }
 
@@ -101,6 +106,8 @@ pub struct DefaultConfig {
     pub mode: String,
     /// Default color behavior.
     pub color: String,
+    /// Default storage concurrency profile.
+    pub storage_profile: String,
 }
 
 impl Default for DefaultConfig {
@@ -112,6 +119,7 @@ impl Default for DefaultConfig {
             channels: "keep-up-to-5.1".to_owned(),
             mode: "add".to_owned(),
             color: "auto".to_owned(),
+            storage_profile: "balanced".to_owned(),
         }
     }
 }
@@ -137,6 +145,10 @@ pub struct EffectiveConfig {
     pub color: Sourced<String>,
     /// Optional structured log file.
     pub log_file: Option<Sourced<PathBuf>>,
+    /// Maximum concurrently processed files.
+    pub jobs: Sourced<usize>,
+    /// Storage concurrency profile.
+    pub storage_profile: Sourced<String>,
     custom_profiles: BTreeMap<String, ProfileFile>,
 }
 
@@ -242,6 +254,42 @@ impl EffectiveConfig {
     }
 }
 
+/// Coarse storage intent used to derive a conservative concurrency default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageProfile {
+    /// Rotational or otherwise seek-sensitive storage.
+    Hdd,
+    /// Conservative general-purpose default.
+    Balanced,
+    /// Explicit solid-state storage intent.
+    Nvme,
+}
+
+impl StorageProfile {
+    /// Parses the stable configuration spelling.
+    pub fn parse(value: &str) -> Result<Self, ConfigError> {
+        match value {
+            "hdd" => Ok(Self::Hdd),
+            "balanced" => Ok(Self::Balanced),
+            "nvme" => Ok(Self::Nvme),
+            value => Err(ConfigError::InvalidValue {
+                field: "storage-profile",
+                reason: format!("unsupported storage profile `{value}`"),
+            }),
+        }
+    }
+
+    /// Returns the stable configuration spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Hdd => "hdd",
+            Self::Balanced => "balanced",
+            Self::Nvme => "nvme",
+        }
+    }
+}
+
 /// Selected configuration path and whether absence is an error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigPath {
@@ -336,6 +384,7 @@ struct FileConfig {
     audio: AudioFile,
     ffmpeg: FfmpegFile,
     output: OutputFile,
+    scheduler: SchedulerFile,
     profiles: BTreeMap<String, ProfileFile>,
 }
 
@@ -358,6 +407,13 @@ struct FfmpegFile {
 #[serde(default, deny_unknown_fields)]
 struct OutputFile {
     directory: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
+struct SchedulerFile {
+    jobs: Option<usize>,
+    storage_profile: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -471,6 +527,8 @@ pub fn load_file(path: &ConfigPath) -> Result<PartialConfig, ConfigError> {
         output_directory: parsed.output.directory,
         color: None,
         log_file: None,
+        jobs: parsed.scheduler.jobs,
+        storage_profile: parsed.scheduler.storage_profile,
         custom_profiles: parsed.profiles,
     })
 }
@@ -487,6 +545,10 @@ pub fn environment_config() -> Result<PartialConfig, ConfigError> {
         output_directory: env::var_os("SONICMUX_OUTPUT_DIR").map(PathBuf::from),
         color: env_text("SONICMUX_COLOR")?,
         log_file: env::var_os("SONICMUX_LOG_FILE").map(PathBuf::from),
+        jobs: env_text("SONICMUX_JOBS")?
+            .map(|value| parse_jobs(&value))
+            .transpose()?,
+        storage_profile: env_text("SONICMUX_STORAGE_PROFILE")?,
         custom_profiles: BTreeMap::new(),
     })
 }
@@ -499,6 +561,16 @@ pub fn merge_config(
     cli: PartialConfig,
 ) -> Result<EffectiveConfig, ConfigError> {
     let custom_profiles = file.custom_profiles.clone();
+    let storage_profile = choose(
+        cli.storage_profile.clone(),
+        environment.storage_profile.clone(),
+        file.storage_profile.clone(),
+        defaults.storage_profile,
+    );
+    let parsed_storage_profile = StorageProfile::parse(storage_profile.value())?;
+    let jobs = choose_optional(cli.jobs, environment.jobs, file.jobs).unwrap_or_else(|| {
+        Sourced::new(default_jobs(parsed_storage_profile), ConfigSource::Default)
+    });
     let effective = EffectiveConfig {
         profile: choose(
             cli.profile,
@@ -528,6 +600,8 @@ pub fn merge_config(
         ),
         color: choose(cli.color, environment.color, file.color, defaults.color),
         log_file: choose_optional(cli.log_file, environment.log_file, file.log_file),
+        jobs,
+        storage_profile,
         custom_profiles,
     };
     let _policy = effective.compatibility_policy()?;
@@ -539,6 +613,7 @@ pub fn merge_config(
             reason: "expected auto, always, or never".to_owned(),
         });
     }
+    validate_jobs(*effective.jobs.value())?;
     Ok(effective)
 }
 
@@ -581,7 +656,7 @@ pub fn initialize_config(path: &ConfigPath) -> Result<(), ConfigError> {
 }
 
 /// Starter configuration written by `config init`.
-pub const STARTER_CONFIG: &str = "version = 1\nprofile = \"generic-tv\"\n\n[audio]\ncodec = \"ac3\"\nbitrate = \"640k\"\nchannels = \"keep-up-to-5.1\"\nmode = \"add\"\n";
+pub const STARTER_CONFIG: &str = "version = 1\nprofile = \"generic-tv\"\n\n[audio]\ncodec = \"ac3\"\nbitrate = \"640k\"\nchannels = \"keep-up-to-5.1\"\nmode = \"add\"\n\n[scheduler]\n# jobs = 2\nstorage-profile = \"balanced\"\n";
 
 fn env_text(name: &'static str) -> Result<Option<String>, ConfigError> {
     match env::var(name) {
@@ -602,6 +677,38 @@ fn choose_optional<T>(cli: Option<T>, env: Option<T>, file: Option<T>) -> Option
     cli.map(|value| Sourced::new(value, ConfigSource::Cli))
         .or_else(|| env.map(|value| Sourced::new(value, ConfigSource::Environment)))
         .or_else(|| file.map(|value| Sourced::new(value, ConfigSource::File)))
+}
+
+fn parse_jobs(value: &str) -> Result<usize, ConfigError> {
+    value
+        .parse::<usize>()
+        .map_err(|_| ConfigError::InvalidValue {
+            field: "jobs",
+            reason: format!("expected an integer from 1 through {MAX_SCHEDULER_JOBS}"),
+        })
+        .and_then(|jobs| {
+            validate_jobs(jobs)?;
+            Ok(jobs)
+        })
+}
+
+fn validate_jobs(jobs: usize) -> Result<(), ConfigError> {
+    if (1..=MAX_SCHEDULER_JOBS).contains(&jobs) {
+        Ok(())
+    } else {
+        Err(ConfigError::InvalidValue {
+            field: "jobs",
+            reason: format!("expected an integer from 1 through {MAX_SCHEDULER_JOBS}"),
+        })
+    }
+}
+
+fn default_jobs(profile: StorageProfile) -> usize {
+    if profile == StorageProfile::Hdd {
+        return 1;
+    }
+    let logical = thread::available_parallelism().map_or(1, usize::from);
+    (logical / 2).clamp(1, 4)
 }
 
 fn parse_bitrate(value: &str) -> Result<u64, ConfigError> {
@@ -753,5 +860,50 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn scheduler_defaults_and_explicit_jobs_are_validated() {
+        let hdd_file = PartialConfig {
+            storage_profile: Some("hdd".to_owned()),
+            ..PartialConfig::default()
+        };
+        let hdd = merge_config(
+            DefaultConfig::default(),
+            hdd_file,
+            PartialConfig::default(),
+            PartialConfig::default(),
+        )
+        .expect("HDD scheduler defaults are valid");
+        assert_eq!(*hdd.jobs.value(), 1);
+        assert_eq!(hdd.jobs.source(), ConfigSource::Default);
+        assert_eq!(hdd.storage_profile.value(), "hdd");
+        assert_eq!(hdd.storage_profile.source(), ConfigSource::File);
+
+        let explicit = merge_config(
+            DefaultConfig::default(),
+            PartialConfig::default(),
+            PartialConfig::default(),
+            PartialConfig {
+                jobs: Some(8),
+                storage_profile: Some("nvme".to_owned()),
+                ..PartialConfig::default()
+            },
+        )
+        .expect("explicit scheduler values are valid");
+        assert_eq!(*explicit.jobs.value(), 8);
+        assert_eq!(explicit.jobs.source(), ConfigSource::Cli);
+        assert_eq!(explicit.storage_profile.value(), "nvme");
+
+        let invalid = merge_config(
+            DefaultConfig::default(),
+            PartialConfig::default(),
+            PartialConfig::default(),
+            PartialConfig {
+                jobs: Some(0),
+                ..PartialConfig::default()
+            },
+        );
+        assert!(invalid.is_err());
     }
 }

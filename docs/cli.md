@@ -1,9 +1,9 @@
 # SonicMux CLI
 
-- Status: Implemented M4 contract
-- Date: 2026-08-10
+- Status: Implemented M5 contract
+- Date: 2026-08-11
 
-This document describes the implemented M4 CLI contract. Exact generated
+This document describes the implemented M5 CLI contract. Exact generated
 wrapping and option ordering are locked by `trycmd` snapshots; names, meanings,
 conflicts, output channels, and exit codes require an approved design change.
 
@@ -45,7 +45,8 @@ newline-delimited events including one terminal batch event. Progress bars are
 disabled when stderr is not a terminal or either JSON mode is active.
 
 Global configuration environment variables use the `SONICMUX_` prefix, for
-example `SONICMUX_FFMPEG_PATH`, `SONICMUX_PROFILE`, and `SONICMUX_CODEC`.
+example `SONICMUX_FFMPEG_PATH`, `SONICMUX_PROFILE`, `SONICMUX_CODEC`,
+`SONICMUX_JOBS`, and `SONICMUX_STORAGE_PROFILE`.
 
 ## Probe
 
@@ -102,6 +103,12 @@ Output and safety:
   -o, --output <PATH>            Output path; requires exactly one input file
       --output-dir <DIR>         Put outputs in this directory
       --dry-run                  Probe and print plans without writing files
+
+Scheduling:
+      --jobs <N>                 Maximum active files [range: 1..=64]
+      --storage-profile <NAME>   Storage intent [values: hdd, balanced, nvme]
+      --continue-on-error        Continue after a file failure (default)
+      --fail-fast                Cancel active files after the first failure
   -h, --help                     Print help
 ```
 
@@ -127,6 +134,27 @@ Default collision behavior is:
 Dry-run performs discovery, FFprobe, config merging, compatibility checks, and
 planning. It does not invoke FFmpeg for execution, create output directories, or
 write temporary files.
+
+Conversion has two bounded phases. SonicMux first probes, plans, inspects
+existing outputs, and rejects duplicate destinations. It then executes ready
+plans. Both phases use the same concurrency limit; results remain ordered by
+input discovery rather than completion time.
+
+Precedence is `--jobs` > `SONICMUX_JOBS` > `[scheduler].jobs` > the storage
+profile default. `hdd` defaults to one job. `balanced` and `nvme` default to
+half the available logical CPUs clamped to 1–4. An explicit job count always
+wins. SonicMux does not attempt automatic disk-type detection.
+
+Continue-on-error is the default: one probe, plan, conflict, or execution error
+does not cancel unrelated files. `--fail-fast` stops admission, cancels active
+child tokens, and waits for process reaping and staging cleanup. User Ctrl+C is
+reported separately with exit code 130.
+
+Interactive stderr uses one preparation counter, an aggregate duration-weighted
+bar, and at most one active bar per concurrency slot. ETA is omitted when input
+duration or observed progress is indeterminate. JSON modes suppress terminal
+bars; `--json-progress` adds job IDs, scheduler stages, aggregate snapshots, and
+exactly one terminal batch event.
 
 ## Scan
 
@@ -171,7 +199,8 @@ Commands:
 
 `config init` always refuses to replace an existing file. `config show
 --sources` annotates each effective value with `cli`, `env`, `config`, or
-`default`.
+`default`. Version-1 TOML accepts `[scheduler].jobs` and
+`[scheduler].storage-profile` as strict additive fields.
 
 ## Presets
 

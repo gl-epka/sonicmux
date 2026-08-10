@@ -42,6 +42,7 @@ fn config_init_is_create_new_and_json_is_versioned() {
             "config",
             "show",
         ])
+        .env("SONICMUX_JOBS", "2")
         .output()
         .expect("config show launches");
     assert!(output.status.success());
@@ -97,4 +98,24 @@ fn explicit_color_wins_and_no_color_disables_auto() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\u{1b}[").not());
+}
+
+#[test]
+fn scheduler_arguments_are_bounded_and_failure_flags_conflict() {
+    cargo_bin_cmd!("sonicmux")
+        .args(["convert", "movie.mkv", "--jobs", "0"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("1 through 64"));
+    cargo_bin_cmd!("sonicmux")
+        .args(["convert", "movie.mkv", "--continue-on-error", "--fail-fast"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("cannot be used with"));
+    cargo_bin_cmd!("sonicmux")
+        .args(["--json", "config", "show"])
+        .env("SONICMUX_JOBS", "65")
+        .assert()
+        .code(2)
+        .stdout(predicate::str::contains("\"exit_code\":2"));
 }
