@@ -966,6 +966,27 @@ async fn supervise(
             &snapshot_tx,
         )
         .await;
+        if options.failure_policy == FailurePolicy::FailFast
+            && terminal
+                .iter()
+                .any(|outcome| matches!(outcome, Some(FileOutcome::Failed(_))))
+        {
+            for (index, plan) in prepared.iter_mut().enumerate() {
+                if plan.take().is_some() && terminal[index].is_none() {
+                    terminal[index] = Some(FileOutcome::Cancelled(CancellationReason::FailFast));
+                    state.files[index].status = FileStatus::Cancelled;
+                    emit(
+                        &event_tx,
+                        BatchEvent::FileFinished {
+                            id: JobId(index),
+                            path: state.files[index].path.clone(),
+                            status: FileStatus::Cancelled,
+                        },
+                    );
+                }
+            }
+            publish(&snapshot_tx, &state);
+        }
     }
 
     let ready = prepared.iter().filter(|value| value.is_some()).count();
@@ -1093,11 +1114,26 @@ async fn prepare_phase(
                             }
                             PreparedResult::Terminal(mut outcome) => {
                                 if matches!(outcome, FileOutcome::Cancelled(_)) {
-                                    outcome = FileOutcome::Cancelled(if fail_fast_triggered {
-                                        CancellationReason::FailFast
+                                    outcome = if root_cancel.is_cancelled() {
+                                        user_cancelled = true;
+                                        stop_admission = true;
+                                        phase_cancel.cancel();
+                                        cancel_pending(
+                                            &mut pending,
+                                            terminal,
+                                            state,
+                                            event_tx,
+                                            CancellationReason::User,
+                                        );
+                                        FileOutcome::Cancelled(CancellationReason::User)
+                                    } else if fail_fast_triggered {
+                                        FileOutcome::Cancelled(CancellationReason::FailFast)
                                     } else {
-                                        CancellationReason::User
-                                    });
+                                        FileOutcome::Failed(FileFailure::new(
+                                            FailureStage::Internal,
+                                            "backend cancelled without a scheduler cancellation",
+                                        ))
+                                    };
                                 }
                                 let status = status_for_outcome(&outcome);
                                 state.files[index].status = status;
@@ -1515,11 +1551,26 @@ async fn execute_phase(
                         let outcome = match task.result {
                             Ok(report) => FileOutcome::Succeeded(report),
                             Err(error) if runtime_error_cancelled(&error) => {
-                                FileOutcome::Cancelled(if user_cancelled {
-                                    CancellationReason::User
+                                if root_cancel.is_cancelled() {
+                                    user_cancelled = true;
+                                    stop_admission = true;
+                                    phase_cancel.cancel();
+                                    cancel_execution_pending(
+                                        &mut pending,
+                                        terminal,
+                                        state,
+                                        event_tx,
+                                        CancellationReason::User,
+                                    );
+                                    FileOutcome::Cancelled(CancellationReason::User)
+                                } else if fail_fast_triggered {
+                                    FileOutcome::Cancelled(CancellationReason::FailFast)
                                 } else {
-                                    CancellationReason::FailFast
-                                })
+                                    FileOutcome::Failed(FileFailure::new(
+                                        FailureStage::Internal,
+                                        "backend cancelled without a scheduler cancellation",
+                                    ))
+                                }
                             }
                             Err(error) => FileOutcome::Failed(FileFailure::new(
                                 FailureStage::Execute,
@@ -2082,6 +2133,75 @@ mod tests {
                 .all(|result| matches!(result.outcome(), FileOutcome::Failed(_)))
         );
         assert_eq!(backend.execute_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn fail_fast_duplicate_conflict_cancels_other_ready_jobs() {
+        let directory = tempdir().expect("temporary directory");
+        let backend = MockBackend::open();
+        let runtime = Runtime::new(Arc::new(backend.clone()));
+        let duplicate = directory.path().join("same.mkv");
+        let report = runtime
+            .start_batch(
+                BatchRequest::new(
+                    vec![
+                        file("a.mkv", duplicate.clone()),
+                        file("b.mkv", duplicate),
+                        file("c.mkv", directory.path().join("unique.mkv")),
+                    ],
+                    options(3, FailurePolicy::FailFast),
+                ),
+                CancellationToken::new(),
+            )
+            .wait()
+            .await
+            .expect("batch supervisor succeeds");
+        assert!(matches!(
+            report.results()[0].outcome(),
+            FileOutcome::Failed(_)
+        ));
+        assert!(matches!(
+            report.results()[1].outcome(),
+            FileOutcome::Failed(_)
+        ));
+        assert!(matches!(
+            report.results()[2].outcome(),
+            FileOutcome::Cancelled(CancellationReason::FailFast)
+        ));
+        assert_eq!(backend.execute_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn fail_fast_execution_cancels_active_and_pending_jobs() {
+        let directory = tempdir().expect("temporary directory");
+        let failed = PathBuf::from("first.mkv");
+        let backend = MockBackend::open()
+            .with_execute_gate(0)
+            .with_execute_failures([failed.clone()]);
+        let runtime = Runtime::new(Arc::new(backend));
+        let report = runtime
+            .start_batch(
+                BatchRequest::new(
+                    vec![
+                        file(failed, directory.path().join("first-output.mkv")),
+                        file("second.mkv", directory.path().join("second-output.mkv")),
+                        file("third.mkv", directory.path().join("third-output.mkv")),
+                    ],
+                    options(2, FailurePolicy::FailFast),
+                ),
+                CancellationToken::new(),
+            )
+            .wait()
+            .await
+            .expect("batch supervisor succeeds");
+        assert!(matches!(
+            report.results()[0].outcome(),
+            FileOutcome::Failed(_)
+        ));
+        assert!(report.results()[1..].iter().all(|result| matches!(
+            result.outcome(),
+            FileOutcome::Cancelled(CancellationReason::FailFast)
+        )));
     }
 
     #[tokio::test]
