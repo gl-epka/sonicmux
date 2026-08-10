@@ -78,7 +78,7 @@ The adapter lives in `sonicmux-ffmpeg`, not in `sonicmux-core`.
 `ffprobe` will be invoked with a stable JSON-oriented contract equivalent to:
 
 ```text
-ffprobe -v error -print_format json -show_streams -show_format -show_chapters INPUT
+ffprobe -v error -of json -show_streams -show_format -show_chapters INPUT
 ```
 
 FFmpeg execution will use `-progress pipe:1 -nostats`. Standard output is

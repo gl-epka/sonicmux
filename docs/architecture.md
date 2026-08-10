@@ -127,7 +127,7 @@ the planner:
 
 ```rust
 pub struct StreamIndex(u32);
-pub struct Bitrate(u32);             // bits per second
+pub struct Bitrate(u64);             // bits per second across all stream types
 pub struct Language(String);         // normalized BCP 47 or retained source value
 pub struct Duration(std::time::Duration);
 

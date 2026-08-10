@@ -1,6 +1,6 @@
 # M2 design: probe, compatibility policy, and pure planning
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-10
 - Milestone: M2
 
