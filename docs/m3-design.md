@@ -375,6 +375,8 @@ argument, and mock-runtime tests stay deterministic on all three operating
 systems. Windows is the first manual end-to-end validation target and must cover
 successful commit, cancellation, destination collision, and absence of a
 console-window/process leak before M3 is accepted as implemented.
+The reproducible result record is in
+[`docs/testing/m3-windows.md`](testing/m3-windows.md).
 
 ## Dependencies introduced by M3
 
