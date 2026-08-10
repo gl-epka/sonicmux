@@ -1,6 +1,6 @@
 # M5 design: bounded parallel scheduler
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-11
 - Milestone: M5
 
