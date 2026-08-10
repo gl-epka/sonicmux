@@ -59,15 +59,18 @@ backend and asynchronous scheduler therefore live in separate crates.
 ```mermaid
 flowchart TD
     core["sonicmux-core\nmodel, policy, pure plan"]
+    backend["sonicmux-backend\nasync media port"]
     ffmpeg["sonicmux-ffmpeg\nprobe and execute"]
     runtime["sonicmux-runtime\nscheduler, cancellation, config loading"]
     cli["sonicmux-cli\nargv and terminal output"]
     tui["sonicmux-tui\nTEA terminal UI"]
     gui["sonicmux-gui\nTauri commands and events"]
 
+    backend --> core
+    ffmpeg --> backend
     ffmpeg --> core
+    runtime --> backend
     runtime --> core
-    runtime --> ffmpeg
     cli --> core
     cli --> runtime
     tui --> core
@@ -77,8 +80,9 @@ flowchart TD
 ```
 
 `sonicmux-core` never depends on another workspace crate. UI crates never invoke
-FFmpeg directly. The runtime depends on a backend interface and can use a mock in
-tests.
+FFmpeg directly. Their composition roots inject an implementation of the port
+from `sonicmux-backend`; runtime can use a mock without depending on the concrete
+FFmpeg adapter.
 
 ## Proposed workspace
 
@@ -93,15 +97,15 @@ sonicmux/
 │   │       ├── policy.rs
 │   │       ├── plan.rs
 │   │       └── config.rs
+│   ├── backend/              # Async media port and transport-neutral events
 │   ├── ffmpeg/               # ffprobe parser and FFmpeg CLI adapter
 │   │   └── src/
 │   │       ├── probe.rs
 │   │       ├── command.rs
 │   │       ├── progress.rs
 │   │       └── process.rs
-│   ├── runtime/              # Backend interface, queue, config sources, safe output
+│   ├── runtime/              # Queue, config sources, validation, safe output
 │   │   └── src/
-│   │       ├── backend.rs
 │   │       ├── scheduler.rs
 │   │       ├── output.rs
 │   │       └── config.rs
@@ -358,5 +362,5 @@ semantics:
    `add` or `replace` conversion.
 4. Default output naming is `<stem>.sonicmux.mkv`.
 5. In-place mode always retains `<name>.bak`; it is not the default.
-6. The extra `ffmpeg` and `runtime` crates enforce the clean-core dependency
-   boundary.
+6. The extra `backend`, `ffmpeg`, and `runtime` crates enforce the clean-core
+   dependency boundary.

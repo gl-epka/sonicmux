@@ -9,6 +9,7 @@ use std::{
     process::Stdio,
 };
 
+use command_group::{AsyncCommandGroup as _, AsyncGroupChild};
 use serde::Deserialize;
 use serde_json::Value;
 use sonicmux_core::{
@@ -20,12 +21,15 @@ use sonicmux_core::{
 use thiserror::Error;
 use tokio::{
     io::{AsyncRead, AsyncReadExt as _},
-    process::{Child, Command},
+    process::Command,
     task::JoinError,
+    time::{Duration, sleep},
 };
+use tokio_util::sync::CancellationToken;
 
 const MAX_PROBE_STDOUT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_PROBE_STDERR_BYTES: usize = 64 * 1024;
+const PROCESS_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
 /// Error produced while invoking FFprobe or interpreting its result.
 #[derive(Debug, Error)]
@@ -81,6 +85,12 @@ pub enum ProbeError {
         /// Join or read diagnostic.
         message: String,
     },
+    /// The bounded stdout reader task failed unexpectedly.
+    #[error("FFprobe stdout reader failed: {message}")]
+    StdoutTask {
+        /// Join diagnostic.
+        message: String,
+    },
     /// FFprobe exited unsuccessfully.
     #[error("FFprobe exited with code {code:?}: {stderr}")]
     Failed {
@@ -89,6 +99,16 @@ pub enum ProbeError {
         /// Bounded stderr tail.
         stderr: String,
     },
+    /// Terminating the FFprobe process group failed after reaping was attempted.
+    #[error("failed to terminate FFprobe process group: {source}")]
+    Terminate {
+        /// Operating-system error.
+        #[source]
+        source: io::Error,
+    },
+    /// Cancellation completed after FFprobe was reaped.
+    #[error("FFprobe operation cancelled")]
+    Cancelled,
     /// Standard output was not valid FFprobe JSON.
     #[error("invalid FFprobe JSON at line {line}, column {column}: {source}")]
     InvalidJson {
@@ -126,14 +146,51 @@ pub enum ProbeError {
 /// External FFmpeg/FFprobe command adapter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FfmpegCliBackend {
+    ffmpeg_path: PathBuf,
     ffprobe_path: PathBuf,
 }
 
-impl FfmpegCliBackend {
-    /// Creates an adapter with an explicit FFprobe executable path.
+/// Explicit paths to a matching FFmpeg and FFprobe toolchain.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FfmpegToolchainPaths {
+    ffmpeg: PathBuf,
+    ffprobe: PathBuf,
+}
+
+impl FfmpegToolchainPaths {
+    /// Creates a named executable pair.
     #[must_use]
-    pub fn new(ffprobe_path: PathBuf) -> Self {
-        Self { ffprobe_path }
+    pub fn new(ffmpeg: PathBuf, ffprobe: PathBuf) -> Self {
+        Self { ffmpeg, ffprobe }
+    }
+
+    /// Returns the FFmpeg executable path.
+    #[must_use]
+    pub fn ffmpeg(&self) -> &Path {
+        &self.ffmpeg
+    }
+
+    /// Returns the FFprobe executable path.
+    #[must_use]
+    pub fn ffprobe(&self) -> &Path {
+        &self.ffprobe
+    }
+}
+
+impl FfmpegCliBackend {
+    /// Creates an adapter with explicit FFmpeg and FFprobe paths.
+    #[must_use]
+    pub fn new(paths: FfmpegToolchainPaths) -> Self {
+        Self {
+            ffmpeg_path: paths.ffmpeg,
+            ffprobe_path: paths.ffprobe,
+        }
+    }
+
+    /// Returns the configured FFmpeg executable.
+    #[must_use]
+    pub fn ffmpeg_path(&self) -> &Path {
+        &self.ffmpeg_path
     }
 
     /// Returns the configured FFprobe executable.
@@ -176,6 +233,19 @@ impl FfmpegCliBackend {
     /// Returns [`ProbeError`] when process execution, JSON parsing, or domain
     /// validation fails.
     pub async fn probe(&self, path: &Path) -> Result<MediaInfo, ProbeError> {
+        self.probe_with_cancel(path, CancellationToken::new()).await
+    }
+
+    /// Probes one local media file with cooperative process cancellation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProbeError`] after the FFprobe process group has been reaped.
+    pub async fn probe_with_cancel(
+        &self,
+        path: &Path,
+        cancel: CancellationToken,
+    ) -> Result<MediaInfo, ProbeError> {
         let absolute_path = if path.is_absolute() {
             path.to_path_buf()
         } else {
@@ -188,37 +258,85 @@ impl FfmpegCliBackend {
             .args(Self::probe_arguments(&absolute_path))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
+            .stderr(Stdio::piped());
         tracing::debug!(
             executable = %self.ffprobe_path.display(),
             input = %absolute_path.display(),
             "probing media"
         );
-        let mut child = command.spawn().map_err(|source| ProbeError::Spawn {
+        let mut group = command.group();
+        group.kill_on_drop(true);
+        #[cfg(windows)]
+        group.creation_flags(0x0800_0000);
+        let mut child = group.spawn().map_err(|source| ProbeError::Spawn {
             executable: self.ffprobe_path.clone(),
             source,
         })?;
-        let mut stdout = child
-            .stdout
-            .take()
-            .ok_or(ProbeError::MissingPipe { pipe: "stdout" })?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or(ProbeError::MissingPipe { pipe: "stderr" })?;
+        let stdout = match child.inner().stdout.take() {
+            Some(stdout) => stdout,
+            None => {
+                terminate_and_reap(&mut child).await?;
+                return Err(ProbeError::MissingPipe { pipe: "stdout" });
+            }
+        };
+        let stderr = match child.inner().stderr.take() {
+            Some(stderr) => stderr,
+            None => {
+                terminate_and_reap(&mut child).await?;
+                return Err(ProbeError::MissingPipe { pipe: "stderr" });
+            }
+        };
+        let mut stdout_task = Some(tokio::spawn(async move {
+            let mut stdout = stdout;
+            read_bounded(&mut stdout, MAX_PROBE_STDOUT_BYTES).await
+        }));
         let stderr_task = tokio::spawn(read_tail(stderr, MAX_PROBE_STDERR_BYTES));
-
-        let stdout_result = read_bounded(&mut stdout, MAX_PROBE_STDOUT_BYTES).await;
-        if stdout_result.is_err() {
-            terminate_and_reap(&mut child).await;
-        }
-        let status = child
-            .wait()
-            .await
-            .map_err(|source| ProbeError::Wait { source })?;
+        let mut stdout_result = None;
+        let status = loop {
+            if stdout_task
+                .as_ref()
+                .is_some_and(tokio::task::JoinHandle::is_finished)
+            {
+                let task = stdout_task.take().ok_or_else(|| ProbeError::StdoutTask {
+                    message: "stdout reader handle disappeared".to_owned(),
+                })?;
+                match join_stdout(task.await) {
+                    Ok(stdout) => stdout_result = Some(stdout),
+                    Err(error) => {
+                        terminate_and_reap(&mut child).await?;
+                        let _ignored = stderr_task.await;
+                        return Err(error);
+                    }
+                }
+            }
+            if let Some(status) = child
+                .try_wait()
+                .map_err(|source| ProbeError::Wait { source })?
+            {
+                break status;
+            }
+            tokio::select! {
+                () = cancel.cancelled() => {
+                    terminate_and_reap(&mut child).await?;
+                    if let Some(task) = stdout_task {
+                        let _ignored = task.await;
+                    }
+                    let _ignored = stderr_task.await;
+                    return Err(ProbeError::Cancelled);
+                }
+                () = sleep(PROCESS_POLL_INTERVAL) => {}
+            }
+        };
+        let stdout = match stdout_result {
+            Some(stdout) => stdout,
+            None => {
+                let task = stdout_task.ok_or_else(|| ProbeError::StdoutTask {
+                    message: "stdout reader handle disappeared".to_owned(),
+                })?;
+                join_stdout(task.await)?
+            }
+        };
         let stderr = join_stderr(stderr_task.await)?;
-        let stdout = stdout_result?;
         if !status.success() {
             return Err(ProbeError::Failed {
                 code: status.code(),
@@ -723,10 +841,31 @@ where
     Ok(tail)
 }
 
-async fn terminate_and_reap(child: &mut Child) {
-    if let Err(error) = child.kill().await {
-        tracing::debug!(%error, "FFprobe was already stopped while handling an output error");
+async fn terminate_and_reap(child: &mut AsyncGroupChild) -> Result<(), ProbeError> {
+    if child
+        .try_wait()
+        .map_err(|source| ProbeError::Wait { source })?
+        .is_some()
+    {
+        return Ok(());
     }
+    let kill_error = child.start_kill().err();
+    child
+        .wait()
+        .await
+        .map_err(|source| ProbeError::Wait { source })?;
+    if let Some(source) = kill_error {
+        return Err(ProbeError::Terminate { source });
+    }
+    Ok(())
+}
+
+fn join_stdout(
+    result: Result<Result<Vec<u8>, ProbeError>, JoinError>,
+) -> Result<Vec<u8>, ProbeError> {
+    result.map_err(|error| ProbeError::StdoutTask {
+        message: error.to_string(),
+    })?
 }
 
 fn join_stderr(

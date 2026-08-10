@@ -8,6 +8,7 @@ Ok(
             input: "movie.mkv",
             output: "movie.sonicmux.mkv",
             action: Transcode,
+            duration: None,
             streams: [
                 Copy {
                     source: StreamIndex(
@@ -119,6 +120,9 @@ Ok(
                         ),
                         layout: KeepUpTo51,
                     },
+                    output_channels: ChannelCount(
+                        6,
+                    ),
                     metadata: MetadataPlan {
                         metadata: Metadata(
                             {
@@ -158,6 +162,9 @@ Ok(
                         ),
                         layout: KeepUpTo51,
                     },
+                    output_channels: ChannelCount(
+                        6,
+                    ),
                     metadata: MetadataPlan {
                         metadata: Metadata(
                             {
@@ -197,9 +204,14 @@ Ok(
                         source: StreamIndex(
                             0,
                         ),
+                        kind: Video,
                         codec: Copied(
                             "hevc",
                         ),
+                        timing: StreamTiming {
+                            start: None,
+                            duration_ticks: None,
+                        },
                         metadata: Metadata(
                             {},
                         ),
@@ -228,9 +240,14 @@ Ok(
                         source: StreamIndex(
                             1,
                         ),
+                        kind: Audio,
                         codec: Copied(
                             "ac3",
                         ),
+                        timing: StreamTiming {
+                            start: None,
+                            duration_ticks: None,
+                        },
                         metadata: Metadata(
                             {
                                 "language": "eng",
@@ -262,9 +279,14 @@ Ok(
                         source: StreamIndex(
                             2,
                         ),
+                        kind: Audio,
                         codec: Copied(
                             "dts",
                         ),
+                        timing: StreamTiming {
+                            start: None,
+                            duration_ticks: None,
+                        },
                         metadata: Metadata(
                             {
                                 "language": "eng",
@@ -296,9 +318,14 @@ Ok(
                         source: StreamIndex(
                             3,
                         ),
+                        kind: Audio,
                         codec: Copied(
                             "dts",
                         ),
+                        timing: StreamTiming {
+                            start: None,
+                            duration_ticks: None,
+                        },
                         metadata: Metadata(
                             {
                                 "language": "eng",
@@ -330,9 +357,14 @@ Ok(
                         source: StreamIndex(
                             2,
                         ),
+                        kind: Audio,
                         codec: Encoded(
                             "AC-3",
                         ),
+                        timing: StreamTiming {
+                            start: None,
+                            duration_ticks: None,
+                        },
                         metadata: Metadata(
                             {
                                 "language": "eng",
@@ -364,9 +396,14 @@ Ok(
                         source: StreamIndex(
                             3,
                         ),
+                        kind: Audio,
                         codec: Encoded(
                             "AC-3",
                         ),
+                        timing: StreamTiming {
+                            start: None,
+                            duration_ticks: None,
+                        },
                         metadata: Metadata(
                             {
                                 "language": "eng",

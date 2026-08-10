@@ -1,6 +1,6 @@
 [package]
-name = "sonicmux-ffmpeg"
-description = "External FFmpeg adapter for SonicMux"
+name = "sonicmux-backend"
+description = "Async media backend port for SonicMux"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,18 +9,10 @@ license.workspace = true
 
 [dependencies]
 async-trait.workspace = true
-command-group.workspace = true
-sonicmux-backend.workspace = true
 sonicmux-core.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
-tracing.workspace = true
-
-[dev-dependencies]
-insta.workspace = true
 
 [lints]
 workspace = true

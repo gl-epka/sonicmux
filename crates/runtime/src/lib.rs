@@ -2,9 +2,14 @@
 #![forbid(unsafe_code)]
 
 pub mod error;
+pub mod execution;
 pub mod observability;
 
 pub use error::RuntimeError;
+pub use execution::{
+    ExecutionError, JobReport, ValidationMismatch, ValidationReport, execute_safely,
+    validate_output,
+};
 
 /// The package name, exposed for workspace smoke tests and diagnostics.
 pub const CRATE_NAME: &str = env!("CARGO_PKG_NAME");
@@ -14,7 +19,7 @@ pub const CRATE_NAME: &str = env!("CARGO_PKG_NAME");
 pub const fn application_layers() -> [&'static str; 3] {
     [
         sonicmux_core::CRATE_NAME,
-        sonicmux_ffmpeg::CRATE_NAME,
+        sonicmux_backend::CRATE_NAME,
         CRATE_NAME,
     ]
 }
@@ -27,7 +32,7 @@ mod tests {
     fn dependency_layers_are_wired_in_order() {
         assert_eq!(
             application_layers(),
-            ["sonicmux-core", "sonicmux-ffmpeg", "sonicmux-runtime"]
+            ["sonicmux-core", "sonicmux-backend", "sonicmux-runtime"]
         );
     }
 }

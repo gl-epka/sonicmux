@@ -7,7 +7,7 @@ use thiserror::Error;
 /// An error produced while discovering or invoking FFmpeg tools.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum BackendError {
+pub enum ToolError {
     /// A required executable was not found at the resolved location.
     #[error("required executable `{name}` was not found at {path}")]
     ExecutableNotFound {
@@ -29,11 +29,11 @@ pub enum BackendError {
 mod tests {
     use std::path::PathBuf;
 
-    use super::BackendError;
+    use super::ToolError;
 
     #[test]
     fn missing_executable_error_contains_the_path() {
-        let error = BackendError::ExecutableNotFound {
+        let error = ToolError::ExecutableNotFound {
             name: "ffmpeg",
             path: PathBuf::from("/missing/ffmpeg"),
         };

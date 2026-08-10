@@ -400,6 +400,8 @@ pub enum OutputStreamPlan {
         source: StreamIndex,
         /// Validated audio target.
         target: AudioTarget,
+        /// Concrete channel count resolved by the pure planner.
+        output_channels: crate::ChannelCount,
         /// Explicit derivative metadata.
         metadata: MetadataPlan,
         /// Explicit output dispositions.
@@ -431,6 +433,17 @@ impl OutputStreamPlan {
             }
         }
     }
+
+    /// Returns the resolved channel count for an encoded derivative.
+    #[must_use]
+    pub const fn output_channels(&self) -> Option<crate::ChannelCount> {
+        match self {
+            Self::Copy { .. } => None,
+            Self::EncodeAudio {
+                output_channels, ..
+            } => Some(*output_channels),
+        }
+    }
 }
 
 /// Expected output codec operation.
@@ -443,11 +456,31 @@ pub enum ExpectedCodec {
     Encoded(&'static str),
 }
 
+/// Expected output stream kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ExpectedStreamKind {
+    /// Video stream.
+    Video,
+    /// Audio stream.
+    Audio,
+    /// Subtitle stream.
+    Subtitle,
+    /// Attachment stream.
+    Attachment,
+    /// Data stream.
+    Data,
+    /// A retained stream kind unknown to this SonicMux version.
+    Unknown(String),
+}
+
 /// One expected output stream used by M3 validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpectedStream {
     source: StreamIndex,
+    kind: ExpectedStreamKind,
     codec: ExpectedCodec,
+    timing: crate::StreamTiming,
     metadata: Metadata,
     dispositions: Dispositions,
 }
@@ -459,10 +492,22 @@ impl ExpectedStream {
         self.source
     }
 
+    /// Returns the expected stream kind.
+    #[must_use]
+    pub const fn kind(&self) -> &ExpectedStreamKind {
+        &self.kind
+    }
+
     /// Returns the expected codec operation.
     #[must_use]
     pub const fn codec(&self) -> &ExpectedCodec {
         &self.codec
+    }
+
+    /// Returns the expected source timing facts.
+    #[must_use]
+    pub const fn timing(&self) -> &crate::StreamTiming {
+        &self.timing
     }
 
     /// Returns expected output metadata.
@@ -518,6 +563,7 @@ pub struct JobPlan {
     input: PathBuf,
     output: PathBuf,
     action: JobAction,
+    duration: Option<crate::DurationMicros>,
     streams: Vec<OutputStreamPlan>,
     copy_chapters: bool,
     copy_global_metadata: bool,
@@ -542,6 +588,12 @@ impl JobPlan {
     #[must_use]
     pub const fn action(&self) -> JobAction {
         self.action
+    }
+
+    /// Returns the probed input duration used for progress calculation.
+    #[must_use]
+    pub const fn duration(&self) -> Option<crate::DurationMicros> {
+        self.duration
     }
 
     /// Returns ordered stream operations.
@@ -796,9 +848,22 @@ fn encode_operation(
     Ok(OutputStreamPlan::EncodeAudio {
         source: stream.common().index(),
         target: target.clone(),
+        output_channels: effective_channel_count(target, stream)?,
         metadata: MetadataPlan { metadata },
         dispositions,
     })
+}
+
+fn effective_channel_count(
+    target: &AudioTarget,
+    stream: &AudioStream,
+) -> Result<crate::ChannelCount, ModelError> {
+    let count = match target.layout() {
+        TargetLayout::Stereo => 2,
+        TargetLayout::Surround51 => 6,
+        TargetLayout::KeepUpTo51 => stream.channels().count().get().min(6),
+    };
+    crate::ChannelCount::new(count)
 }
 
 fn effective_layout_label(target: &AudioTarget, stream: &AudioStream) -> &'static str {
@@ -842,7 +907,11 @@ fn job_plan(
                 });
                 ExpectedStream {
                     source: *source,
+                    kind: expected_stream_kind(source_stream),
                     codec: ExpectedCodec::Copied(codec),
+                    timing: source_stream.map_or_else(crate::StreamTiming::default, |stream| {
+                        stream.common().timing().clone()
+                    }),
                     metadata,
                     dispositions: dispositions.clone(),
                 }
@@ -850,14 +919,25 @@ fn job_plan(
             OutputStreamPlan::EncodeAudio {
                 source,
                 target,
+                output_channels: _,
                 metadata,
                 dispositions,
-            } => ExpectedStream {
-                source: *source,
-                codec: ExpectedCodec::Encoded(target.codec_label()),
-                metadata: metadata.metadata().clone(),
-                dispositions: dispositions.clone(),
-            },
+            } => {
+                let source_stream = media
+                    .streams()
+                    .iter()
+                    .find(|stream| stream.index() == *source);
+                ExpectedStream {
+                    source: *source,
+                    kind: ExpectedStreamKind::Audio,
+                    codec: ExpectedCodec::Encoded(target.codec_label()),
+                    timing: source_stream.map_or_else(crate::StreamTiming::default, |stream| {
+                        stream.common().timing().clone()
+                    }),
+                    metadata: metadata.metadata().clone(),
+                    dispositions: dispositions.clone(),
+                }
+            }
         })
         .collect();
     let mut warnings = Vec::new();
@@ -873,6 +953,7 @@ fn job_plan(
         input: media.path().to_path_buf(),
         output: policy.output_path().to_path_buf(),
         action,
+        duration: media.format().duration(),
         streams,
         copy_chapters: true,
         copy_global_metadata: true,
@@ -882,6 +963,18 @@ fn job_plan(
             chapters: media.chapters().to_vec(),
             global_metadata: media.format().metadata().clone(),
         },
+    }
+}
+
+fn expected_stream_kind(stream: Option<&StreamInfo>) -> ExpectedStreamKind {
+    match stream {
+        Some(StreamInfo::Video(_)) => ExpectedStreamKind::Video,
+        Some(StreamInfo::Audio(_)) => ExpectedStreamKind::Audio,
+        Some(StreamInfo::Subtitle(_)) => ExpectedStreamKind::Subtitle,
+        Some(StreamInfo::Attachment(_)) => ExpectedStreamKind::Attachment,
+        Some(StreamInfo::Data(_)) => ExpectedStreamKind::Data,
+        Some(StreamInfo::Unknown(stream)) => ExpectedStreamKind::Unknown(stream.kind().to_owned()),
+        None => ExpectedStreamKind::Unknown("unknown".to_owned()),
     }
 }
 
