@@ -1,0 +1,47 @@
+name: Bug report
+description: Report reproducible SonicMux behavior.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Remove private paths and media metadata before posting diagnostics.
+  - type: input
+    id: version
+    attributes:
+      label: SonicMux version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+      placeholder: "Windows 11 24H2 x86_64"
+    validations:
+      required: true
+  - type: textarea
+    id: ffmpeg
+    attributes:
+      label: FFmpeg diagnostics
+      description: Paste `sonicmux doctor --json` output, after reviewing it for private paths.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Playback device
+      description: TV, receiver, soundbar, or player model when relevant.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

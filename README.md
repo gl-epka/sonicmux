@@ -38,8 +38,9 @@ cargo install --path crates/tui --locked
 
 The installed executables are named `sonicmux` and `sonicmux-tui`.
 
-Publication as `cargo install sonicmux-cli` is planned for the M8 release
-milestone; it is not presented here as already available.
+The first registry release will be installable with `cargo install sonicmux`
+and `cargo install sonicmux-tui`. Until `v0.1.0` is published, use the local
+path commands above.
 
 ## Quick start
 

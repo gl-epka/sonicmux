@@ -3703,18 +3703,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sonicmux-backend"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "sonicmux-core",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "sonicmux-cli"
+name = "sonicmux"
 version = "0.1.0"
 dependencies = [
  "anstream",
@@ -3737,6 +3726,17 @@ dependencies = [
  "tracing",
  "trycmd",
  "which",
+]
+
+[[package]]
+name = "sonicmux-backend"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "sonicmux-core",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
