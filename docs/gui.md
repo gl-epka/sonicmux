@@ -1,6 +1,6 @@
 # Desktop interface
 
-SonicMux M7 adds one offline desktop window for Windows, macOS, and Linux. It
+SonicMux provides one offline desktop window for Windows, macOS, and Linux. It
 uses the same MKV-only planner, safe output transaction, and bounded scheduler
 as the CLI and TUI. Windows is the first manual-validation platform.
 
@@ -35,9 +35,11 @@ installed `ffmpeg`/`ffprobe` sidecar pair, then the system `PATH`. If no pair is
 available, the setup screen lets the user choose an existing FFmpeg executable
 next to FFprobe. SonicMux never downloads or updates it automatically.
 
-M7 checks the target-suffixed Tauri sidecar contract but deliberately does not
-publish third-party executables. Pinned LGPL payloads, checksums, corresponding
-source, notices, signing, installers, and GitHub Release artifacts are M8.
+M8 release bundles contain target-suffixed FFmpeg 8.1.2 and FFprobe sidecars
+built from the pinned official source. The same release includes their SHA-256
+hashes, detached source signature, signing key, configure flags, build manifests,
+LGPL text, source archive, notices, and an unchanged-source `changes.diff`.
+Open **Help → About SonicMux** to see the application and FFmpeg license summary.
 
 ## Develop and verify
 
@@ -88,5 +90,6 @@ active to refresh screenshots at 1180×760:
 
 - MKV input and output only;
 - one non-recursive directory per picker action;
-- no automatic downloads, updater, release installers, or signing in M7;
+- no automatic downloads or updater;
+- version 0.1.0 Windows and macOS installers are unsigned previews;
 - output files are never overwritten or replaced in place.

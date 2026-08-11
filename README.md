@@ -1,5 +1,10 @@
 # SonicMux
 
+[![CI](https://github.com/gl-epka/sonicmux/actions/workflows/ci.yml/badge.svg)](https://github.com/gl-epka/sonicmux/actions/workflows/ci.yml)
+[![Security](https://github.com/gl-epka/sonicmux/actions/workflows/security.yml/badge.svg)](https://github.com/gl-epka/sonicmux/actions/workflows/security.yml)
+[![MSRV 1.88](https://img.shields.io/badge/MSRV-1.88-DEA584.svg)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
+
 ![SonicMux desktop interface](docs/assets/gui/sonicmux-gui-planned.png)
 
 SonicMux makes MKV audio playable on televisions and media renderers without
@@ -7,8 +12,9 @@ re-encoding video. It preserves original streams, metadata, chapters, and
 attachments while changing only audio tracks that a selected device profile
 cannot play. Remux-only mode can instead make a compatible track the default.
 
-M7 adds a cross-platform Tauri desktop interface alongside the complete CLI and
-keyboard-first terminal dashboard. All three use the same bounded scheduler.
+SonicMux provides a CLI, a keyboard-first terminal dashboard, and a
+cross-platform Tauri desktop interface. All three use the same safe core and
+bounded scheduler.
 
 ## Problem → solution
 
@@ -22,7 +28,7 @@ unless another output mode was explicitly selected.
 - Windows, macOS, or Linux;
 - FFmpeg and FFprobe together on `PATH`, or supplied with `--ffmpeg-path` or
   `SONICMUX_FFMPEG_PATH`;
-- Rust 1.85 or newer when installing from source.
+- Rust 1.88 or newer when installing from source.
 
 SonicMux does not download FFmpeg in CLI mode. Obtain it from an operating
 system package manager or the [official FFmpeg download page](https://ffmpeg.org/download.html).
@@ -38,8 +44,15 @@ cargo install --path crates/tui --locked
 
 The installed executables are named `sonicmux` and `sonicmux-tui`.
 
-Publication as `cargo install sonicmux-cli` is planned for the M8 release
-milestone; it is not presented here as already available.
+After `v0.1.0` is published, the registry packages install with:
+
+```console
+cargo install sonicmux --locked
+cargo install sonicmux-tui --locked
+```
+
+Until that tag is public, use the local path commands above; the README never
+claims an unpublished registry package is available.
 
 ## Quick start
 
@@ -97,7 +110,7 @@ The SonicMux desktop app provides native file and folder pickers, Explorer or
 Finder drag/drop, track inspection, conversion settings, progress, safe
 cancellation, and explicit FFmpeg setup in one offline window.
 
-Run it from a checkout with Node 24 and Rust 1.85 or newer:
+Run it from a checkout with Node 24 and Rust 1.88 or newer:
 
 ```console
 cd crates/gui
@@ -105,10 +118,29 @@ npm ci
 npm run tauri dev
 ```
 
-The application checks configured FFmpeg first, then a packaged sidecar pair,
-then the system `PATH`. M7 does not yet distribute third-party FFmpeg payloads
-or signed installers. See [desktop usage, development, and security](docs/gui.md)
-and the [Windows-first validation record](docs/testing/m7-windows.md).
+The application checks configured FFmpeg first, then its packaged sidecar pair,
+then the system `PATH`. Release bundles build FFmpeg 8.1.2 from its verified
+official source and include the corresponding license and source offer.
+
+The first Windows and macOS packages are deliberately named **unsigned
+preview**: they can trigger SmartScreen or Gatekeeper warnings. Checksums and
+GitHub artifact attestations prove release provenance but are not a substitute
+for platform code signing. See [desktop usage and security](docs/gui.md), the
+[release guide](docs/releasing.md), and the
+[Windows-first release checklist](docs/testing/m8-release.md).
+
+## Verify a release download
+
+Download `SHA256SUMS` beside the chosen artifact, then run from that directory:
+
+```console
+sha256sum -c SHA256SUMS --ignore-missing
+gh attestation verify <artifact> --repo gl-epka/sonicmux
+```
+
+On macOS, use `shasum -a 256 -c SHA256SUMS` if GNU `sha256sum` is unavailable.
+The attestation verifies GitHub build provenance; it does not suppress operating
+system warnings for unsigned GUI packages.
 
 ## Safety model
 
@@ -200,14 +232,36 @@ inspected.
 ## Current limitations
 
 - MKV input/output only;
-- hybrid configured/sidecar/system FFmpeg resolution for the GUI, without a
-  redistributable sidecar payload yet;
-- no replacing transaction, updater, signed installers, or release binaries yet.
+- no replacing transaction, automatic updater, or in-place overwrite mode;
+- `v0.1.0` Windows and macOS desktop packages are unsigned previews;
+- CLI/TUI archives intentionally require a separately installed FFmpeg pair.
+
+## FAQ
+
+### Does SonicMux re-encode video?
+
+No. Conversion plans copy video packets and validate them after FFmpeg exits.
+
+### Will SonicMux overwrite my MKV?
+
+No. It writes to a private sibling staging directory and publishes only to a
+new destination that does not already exist.
+
+### Why is FFmpeg included in the GUI but not the CLI archive?
+
+The GUI needs a predictable first-run experience. CLI and TUI users usually
+manage FFmpeg through their operating system, so their archives remain small.
+
+### Why does Windows or macOS warn about the desktop package?
+
+The first release has no Authenticode or Apple Developer ID credentials. Verify
+its checksum and GitHub attestation, then apply your local security policy.
 
 ## License
 
-Licensed under either Apache-2.0 or MIT, at your option. FFmpeg is an external
-tool and retains its own licensing terms.
+Licensed under either Apache-2.0 or MIT, at your option. Bundled FFmpeg and
+FFprobe remain separate LGPL-2.1-or-later programs. See
+[third-party notices](THIRD_PARTY_LICENSES.md).
 
 ## Acknowledgements
 

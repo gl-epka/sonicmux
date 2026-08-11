@@ -435,10 +435,10 @@ impl Model {
                 self.remove_selected();
             }
             KeyCode::Char(' ') if self.phase == AppPhase::Idle && self.screen == Screen::Queue => {
-                if let Some(index) = self.selected {
-                    if let Some(item) = self.queue.get_mut(index) {
-                        item.enabled = !item.enabled;
-                    }
+                if let Some(index) = self.selected
+                    && let Some(item) = self.queue.get_mut(index)
+                {
+                    item.enabled = !item.enabled;
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
@@ -605,18 +605,18 @@ impl Model {
 
     fn on_snapshot(&mut self, snapshot: Arc<BatchSnapshot>) {
         for file in snapshot.files() {
-            if let Some(queue_id) = self.active_queue_ids.get(file.id().get()) {
-                if let Some(item) = self.queue.iter_mut().find(|item| item.id == *queue_id) {
-                    item.status = queue_status(file.status());
-                    item.progress_milli = match (file.position_us(), file.duration_us()) {
-                        (Some(position), Some(duration)) if duration > 0 => {
-                            let milli = position.saturating_mul(1_000) / duration;
-                            Some(u16::try_from(milli.min(1_000)).unwrap_or(1_000))
-                        }
-                        _ => None,
-                    };
-                    item.eta = file.eta();
-                }
+            if let Some(queue_id) = self.active_queue_ids.get(file.id().get())
+                && let Some(item) = self.queue.iter_mut().find(|item| item.id == *queue_id)
+            {
+                item.status = queue_status(file.status());
+                item.progress_milli = match (file.position_us(), file.duration_us()) {
+                    (Some(position), Some(duration)) if duration > 0 => {
+                        let milli = position.saturating_mul(1_000) / duration;
+                        Some(u16::try_from(milli.min(1_000)).unwrap_or(1_000))
+                    }
+                    _ => None,
+                };
+                item.eta = file.eta();
             }
         }
         self.snapshot = Some(snapshot);

@@ -234,12 +234,12 @@ impl CompatibilityPolicy {
     /// Returns [`PolicyError::UnknownCodec`] when the codec is completely unknown
     /// and fallback decoding was not explicitly enabled.
     pub fn classify(&self, stream: &AudioStream) -> Result<Compatibility, PolicyError> {
-        if let AudioCodec::Other(codec) = stream.codec() {
-            if self.unknown_codec == UnknownCodecBehavior::Reject {
-                return Err(PolicyError::UnknownCodec {
-                    codec: codec.clone(),
-                });
-            }
+        if let AudioCodec::Other(codec) = stream.codec()
+            && self.unknown_codec == UnknownCodecBehavior::Reject
+        {
+            return Err(PolicyError::UnknownCodec {
+                codec: codec.clone(),
+            });
         }
 
         let family = stream.codec().family();
@@ -259,10 +259,9 @@ impl CompatibilityPolicy {
         }
         if let (Some(allowed), Some(layout)) =
             (&rule.allowed_layouts, stream.channels().layout_name())
+            && !allowed.contains(layout)
         {
-            if !allowed.contains(layout) {
-                reasons.push(IncompatibilityReason::UnsupportedLayout(layout.to_owned()));
-            }
+            reasons.push(IncompatibilityReason::UnsupportedLayout(layout.to_owned()));
         }
 
         Ok(match Incompatibilities::from_reasons(reasons) {

@@ -1,6 +1,19 @@
 {
   "bundle": {
     "active": true,
-    "externalBin": ["binaries/ffmpeg", "binaries/ffprobe"]
+    "targets": "all",
+    "externalBin": ["binaries/ffmpeg", "binaries/ffprobe"],
+    "publisher": "SonicMux contributors",
+    "copyright": "Copyright © 2026 SonicMux contributors",
+    "category": "Utility",
+    "shortDescription": "MKV audio compatibility without video re-encoding",
+    "longDescription": "SonicMux converts or remuxes incompatible MKV audio while preserving video, subtitles, chapters, attachments, and metadata.",
+    "licenseFile": "../../../LICENSE-MIT",
+    "resources": {
+      "../../../LICENSE-APACHE": "licenses/LICENSE-APACHE",
+      "../../../LICENSE-MIT": "licenses/LICENSE-MIT",
+      "../../../THIRD_PARTY_LICENSES.md": "licenses/THIRD_PARTY_LICENSES.md",
+      "../../../distribution/ffmpeg/COPYING.LGPLv2.1": "licenses/COPYING.LGPLv2.1"
+    }
   }
 }

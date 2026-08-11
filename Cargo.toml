@@ -14,9 +14,14 @@ resolver = "3"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85.0"
-authors = ["SonicMux contributors"]
+rust-version = "1.88.0"
+authors = ["Gleb Nechaev and SonicMux contributors"]
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/gl-epka/sonicmux"
+homepage = "https://github.com/gl-epka/sonicmux"
+readme = "README.md"
+keywords = ["mkv", "ffmpeg", "dts", "ac3", "audio"]
+categories = ["command-line-utilities", "multimedia::audio", "multimedia::video"]
 
 [workspace.dependencies]
 anyhow = "1.0.104"

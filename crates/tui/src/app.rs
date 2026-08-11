@@ -40,13 +40,13 @@ pub struct App {
 impl App {
     /// Loads configuration, resolves FFmpeg, and creates a terminal application.
     pub fn new(arguments: TuiArgs) -> Result<Self> {
-        if let Some(directory) = &arguments.output_dir {
-            if !directory.is_dir() {
-                return Err(eyre!(
-                    "output directory does not exist: {}",
-                    directory.display()
-                ));
-            }
+        if let Some(directory) = &arguments.output_dir
+            && !directory.is_dir()
+        {
+            return Err(eyre!(
+                "output directory does not exist: {}",
+                directory.display()
+            ));
         }
         let config_path = select_config_path(arguments.config.clone())?;
         let mut overrides = PartialConfig::default();
@@ -55,13 +55,13 @@ impl App {
         overrides.log_file = arguments.log_file.clone();
         overrides.color = arguments.no_color.then(|| "never".to_owned());
         let config = load_effective_config(&config_path, overrides)?;
-        if let Some(directory) = config.output_directory.as_ref() {
-            if !directory.value().is_dir() {
-                return Err(eyre!(
-                    "output directory does not exist: {}",
-                    directory.value().display()
-                ));
-            }
+        if let Some(directory) = config.output_directory.as_ref()
+            && !directory.value().is_dir()
+        {
+            return Err(eyre!(
+                "output directory does not exist: {}",
+                directory.value().display()
+            ));
         }
         let observability = init_tracing_with(ObservabilityOptions {
             filter: std::env::var("RUST_LOG").unwrap_or_else(|_| "sonicmux=info,warn".to_owned()),
@@ -158,10 +158,10 @@ impl App {
                 }
             }
         }
-        if self.model.phase != AppPhase::Idle {
-            if let Some(cancel) = &self.active_batch_cancel {
-                cancel.cancel();
-            }
+        if self.model.phase != AppPhase::Idle
+            && let Some(cancel) = &self.active_batch_cancel
+        {
+            cancel.cancel();
         }
         self.root_cancel.cancel();
         input.stop();

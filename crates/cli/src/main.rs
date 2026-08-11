@@ -488,13 +488,12 @@ async fn convert_command(
         .output_dir
         .as_ref()
         .or_else(|| config.output_directory.as_ref().map(|value| value.value()))
+        && !directory.is_dir()
     {
-        if !directory.is_dir() {
-            return Err(CliFailure::new(
-                2,
-                format!("output directory does not exist: {}", directory.display()),
-            ));
-        }
+        return Err(CliFailure::new(
+            2,
+            format!("output directory does not exist: {}", directory.display()),
+        ));
     }
     let compatibility = Arc::new(config.compatibility_policy().map_err(config_failure)?);
     let target = config.audio_target().map_err(config_failure)?;
@@ -742,10 +741,10 @@ fn render_batch_snapshot(
             });
             bar.set_message(format!("{}{}", file.path().display(), eta));
         }
-        if file.status().is_terminal() {
-            if let Some(bar) = file_bars.remove(&file.id().get()) {
-                bar.finish_and_clear();
-            }
+        if file.status().is_terminal()
+            && let Some(bar) = file_bars.remove(&file.id().get())
+        {
+            bar.finish_and_clear();
         }
     }
 }
