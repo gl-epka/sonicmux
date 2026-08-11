@@ -156,6 +156,16 @@ jobs:
       - name: Build native desktop application
         working-directory: crates/gui
         run: npm run tauri build -- --no-bundle
+      - name: Preserve production Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./target/m7-windows-manual | Out-Null
+          Copy-Item -LiteralPath ./target/release/sonicmux-gui.exe -Destination ./target/m7-windows-manual/sonicmux-gui.exe
+      - name: Build Windows validation variant
+        if: runner.os == 'Windows'
+        working-directory: crates/gui
+        run: npm run tauri build -- --no-bundle --config src-tauri/tauri.ci.conf.json
       - name: Smoke-test the native Windows window
         if: runner.os == 'Windows'
         shell: pwsh
@@ -166,13 +176,19 @@ jobs:
             -NativeScreenshot ./target/m7-windows-native.png `
             -Diagnostics ./target/m7-windows-webview-processes.json `
             -Report ./target/m7-windows-smoke.json
-      - name: Upload Windows validation bundle
+      - name: Upload production Windows executable
         if: runner.os == 'Windows' && always()
         uses: actions/upload-artifact@v4
         with:
           name: sonicmux-m7-windows-manual
+          path: target/m7-windows-manual/sonicmux-gui.exe
+          if-no-files-found: error
+      - name: Upload Windows validation evidence
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonicmux-m7-windows-validation
           path: |
-            target/release/sonicmux-gui.exe
             target/m7-windows-smoke.png
             target/m7-windows-native.png
             target/m7-windows-webview-processes.json

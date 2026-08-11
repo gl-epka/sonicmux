@@ -7,9 +7,11 @@
 CI first launches the release executable on `windows-latest`, verifies the native
 window title and 760×560 minimum-size contract, then uses the local WebView2
 DevTools endpoint to assert that the DOM rendered the expected SonicMux content.
-The `sonicmux-m7-windows-manual` artifact contains the executable, JSON report,
-WebView screenshot, and native-window screenshot. Review that evidence before the
-interactive checks below.
+The production executable remains free of debugging flags in the
+`sonicmux-m7-windows-manual` artifact. The separate
+`sonicmux-m7-windows-validation` artifact contains the JSON report, WebView
+screenshot, native-window screenshot, and process diagnostics. Review that
+evidence before the interactive checks below.
 
 Record the tester, Windows build, WebView2 version, FFmpeg build, commit, date,
 and evidence links before changing the status to `Passed`.

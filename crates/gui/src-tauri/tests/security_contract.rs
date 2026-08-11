@@ -60,3 +60,25 @@ fn production_webview_is_local_and_sidecars_are_a_pair() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn remote_debugging_is_confined_to_the_ci_validation_config() -> Result<()> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let production = read_json(&root.join("tauri.conf.json"))?;
+    let validation = read_json(&root.join("tauri.ci.conf.json"))?;
+
+    assert!(
+        production["app"]["windows"][0]
+            .get("additionalBrowserArgs")
+            .is_none()
+    );
+    assert_eq!(
+        validation["app"]["windows"][0]["additionalBrowserArgs"],
+        "--remote-debugging-port=9227 --remote-allow-origins=*"
+    );
+    assert_eq!(
+        validation["app"]["windows"][0]["dataDirectory"],
+        "ci-webview"
+    );
+    Ok(())
+}

@@ -120,17 +120,10 @@ $diagnosticsDirectory = Split-Path -Parent $Diagnostics
 $reportDirectory = Split-Path -Parent $Report
 New-Item -ItemType Directory -Force -Path $screenshotDirectory, $nativeScreenshotDirectory, $diagnosticsDirectory, $reportDirectory | Out-Null
 
-$portReservation = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-$portReservation.Start()
-$debuggingPort = ([System.Net.IPEndPoint]$portReservation.LocalEndpoint).Port
-$portReservation.Stop()
-$browserArguments = "--remote-debugging-port=$debuggingPort"
+$debuggingPort = 9227
+$browserArguments = "--remote-debugging-port=$debuggingPort --remote-allow-origins=*"
 
-$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-$startInfo.FileName = $resolvedExecutable
-$startInfo.UseShellExecute = $false
-$startInfo.Environment["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $browserArguments
-$process = [System.Diagnostics.Process]::Start($startInfo)
+$process = Start-Process -FilePath $resolvedExecutable -PassThru
 if ($null -eq $process) {
     throw "Windows did not start the SonicMux process."
 }
