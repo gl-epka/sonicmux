@@ -579,8 +579,11 @@ mod tests {
             PartialConfig::default(),
         )
         .expect("default config is valid");
+        let mut settings =
+            UiSettings::from_config(&config, false, None).expect("settings are valid");
+        settings.jobs = 4;
         Model::new(
-            UiSettings::from_config(&config, false, None).expect("settings are valid"),
+            settings,
             DiscoveryRequest {
                 roots: Vec::new(),
                 recursive: false,
