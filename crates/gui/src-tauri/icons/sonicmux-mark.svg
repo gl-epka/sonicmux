@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">SonicMux wave mark</title>
+  <rect width="512" height="512" rx="112" fill="#07111f"/>
+  <path d="M96 268c42 0 42-104 84-104s42 184 84 184 42-216 84-216 42 136 68 136" fill="none" stroke="#22d3ee" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M108 384h296" fill="none" stroke="#f8fafc" stroke-opacity=".9" stroke-width="28" stroke-linecap="round"/>
+</svg>

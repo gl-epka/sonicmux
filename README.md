@@ -1,15 +1,14 @@
 # SonicMux
 
-![SonicMux terminal interface](docs/assets/sonicmux-tui.gif)
+![SonicMux desktop interface](docs/assets/gui/sonicmux-gui-planned.png)
 
 SonicMux makes MKV audio playable on televisions and media renderers without
 re-encoding video. It preserves original streams, metadata, chapters, and
 attachments while changing only audio tracks that a selected device profile
 cannot play. Remux-only mode can instead make a compatible track the default.
 
-M6 provides the complete command-line application and a keyboard-first terminal
-dashboard over the same bounded scheduler. The desktop GUI is the next product
-milestone.
+M7 adds a cross-platform Tauri desktop interface alongside the complete CLI and
+keyboard-first terminal dashboard. All three use the same bounded scheduler.
 
 ## Problem → solution
 
@@ -91,6 +90,25 @@ The interface adapts to narrow terminals, preserves textual status labels when
 `NO_COLOR` is set, and restores raw mode and the alternate screen on ordinary
 errors and panics. Regenerate the demo with `docs/demo/record-m6.sh` after
 installing [VHS](https://github.com/charmbracelet/vhs).
+
+## Desktop interface
+
+The SonicMux desktop app provides native file and folder pickers, Explorer or
+Finder drag/drop, track inspection, conversion settings, progress, safe
+cancellation, and explicit FFmpeg setup in one offline window.
+
+Run it from a checkout with Node 24 and Rust 1.85 or newer:
+
+```console
+cd crates/gui
+npm ci
+npm run tauri dev
+```
+
+The application checks configured FFmpeg first, then a packaged sidecar pair,
+then the system `PATH`. M7 does not yet distribute third-party FFmpeg payloads
+or signed installers. See [desktop usage, development, and security](docs/gui.md)
+and the [Windows-first manual checklist](docs/testing/m7-windows.md).
 
 ## Safety model
 
@@ -182,8 +200,9 @@ inspected.
 ## Current limitations
 
 - MKV input/output only;
-- system FFmpeg for CLI/TUI delivery;
-- no replacing transaction, GUI, or release binaries yet.
+- hybrid configured/sidecar/system FFmpeg resolution for the GUI, without a
+  redistributable sidecar payload yet;
+- no replacing transaction, updater, signed installers, or release binaries yet.
 
 ## License
 

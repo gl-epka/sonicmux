@@ -3,4 +3,7 @@
 .DS_Store
 .idea/
 .vscode/
-
+crates/gui/node_modules/
+crates/gui/dist/*
+!crates/gui/dist/.gitkeep
+crates/gui/src-tauri/gen/schemas/

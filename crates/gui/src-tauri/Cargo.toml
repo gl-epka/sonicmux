@@ -1,15 +1,36 @@
 [package]
 name = "sonicmux-gui"
-description = "Tauri adapter for the SonicMux graphical interface"
+description = "Cross-platform SonicMux desktop interface"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
+build = "build.rs"
+
+[lib]
+name = "sonicmux_gui"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 sonicmux-core.workspace = true
+sonicmux-ffmpeg.workspace = true
 sonicmux-runtime.workspace = true
+tauri.workspace = true
+tauri-plugin-dialog.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+
+[build-dependencies]
+tauri-build.workspace = true
 
 [lints]
 workspace = true

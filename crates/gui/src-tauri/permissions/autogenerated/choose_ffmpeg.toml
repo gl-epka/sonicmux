@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-choose-ffmpeg"
+description = "Enables the choose_ffmpeg command without any pre-configured scope."
+commands.allow = ["choose_ffmpeg"]
+
+[[permission]]
+identifier = "deny-choose-ffmpeg"
+description = "Denies the choose_ffmpeg command without any pre-configured scope."
+commands.deny = ["choose_ffmpeg"]
