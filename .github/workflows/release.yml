@@ -243,7 +243,7 @@ jobs:
             msystem: CLANGARM64
             toolchain: mingw-w64-clang-aarch64-toolchain
             cc: clang
-            ffmpeg_flags: --arch=aarch64 --enable-cross-compile
+            ffmpeg_flags: --arch=aarch64 --enable-cross-compile --host-cc=clang
     runs-on: ${{ matrix.runner }}
     environment:
       name: ${{ github.ref_type == 'tag' && 'release-signing' || 'release-preview' }}
@@ -278,6 +278,14 @@ jobs:
           CC='${{ matrix.cc }}' SONICMUX_FFMPEG_EXTRA_FLAGS='${{ matrix.ffmpeg_flags }}' distribution/ffmpeg/build.sh "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2" "$RUNNER_TEMP/ffmpeg-install"
           distribution/ffmpeg/verify.sh "$RUNNER_TEMP/ffmpeg-install/bin/ffmpeg.exe" "$RUNNER_TEMP/ffmpeg-install/bin/ffprobe.exe"
           distribution/ffmpeg/stage-sidecars.sh "$RUNNER_TEMP/ffmpeg-install/bin" "${{ matrix.target }}"
+      - name: Upload FFmpeg configure log on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-config-${{ matrix.target }}
+          path: ${{ runner.temp }}/ffmpeg-source/ffmpeg-8.1.2/ffbuild/config.log
+          if-no-files-found: warn
+          retention-days: 3
       - name: Convert a real DTS fixture with the sidecar
         shell: pwsh
         env:
