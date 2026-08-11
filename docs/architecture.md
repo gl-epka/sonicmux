@@ -121,8 +121,8 @@ sonicmux/
 ```
 
 Package names are `sonicmux-core`, `sonicmux-ffmpeg`, and so on. The installed
-CLI binary is `sonicmux`; the TUI binary is provisionally `sonicmux-tui`. The GUI
-uses the display name SonicMux.
+CLI binary is `sonicmux`; the TUI binary is `sonicmux-tui`. The GUI uses the
+display name SonicMux.
 
 ## Domain model sketch
 

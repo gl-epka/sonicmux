@@ -109,8 +109,16 @@ fn render_queue(frame: &mut Frame<'_>, area: Rect, model: &Model) {
         return;
     }
     let compact = area.width < MEDIUM_WIDTH;
-    let rows = model
-        .queue
+    let visible_capacity = usize::from(area.height.saturating_sub(4).max(1));
+    let selected = model.selected.unwrap_or(0).min(model.queue.len() - 1);
+    let start = selected
+        .saturating_add(1)
+        .saturating_sub(visible_capacity)
+        .min(model.queue.len().saturating_sub(visible_capacity));
+    let end = start
+        .saturating_add(visible_capacity)
+        .min(model.queue.len());
+    let rows = model.queue[start..end]
         .iter()
         .map(|item| queue_row(item, compact, model.color));
     let widths: Vec<Constraint> = if compact {
@@ -133,6 +141,11 @@ fn render_queue(frame: &mut Frame<'_>, area: Rect, model: &Model) {
     } else {
         vec!["Use", "State", "File", "Done", "ETA"]
     };
+    let title = if model.queue.len() > visible_capacity {
+        format!("Queue ({}–{} of {})", start + 1, end, model.queue.len())
+    } else {
+        "Queue".to_owned()
+    };
     let table = Table::new(rows, widths)
         .header(
             Row::new(headers)
@@ -141,8 +154,9 @@ fn render_queue(frame: &mut Frame<'_>, area: Rect, model: &Model) {
         )
         .row_highlight_style(selection(model.color))
         .highlight_symbol("> ")
-        .block(focused_block("Queue", model.color));
-    let mut state = TableState::default().with_selected(model.selected);
+        .block(focused_block(&title, model.color));
+    let mut state = TableState::default()
+        .with_selected(model.selected.map(|index| index.saturating_sub(start)));
     frame.render_stateful_widget(table, area, &mut state);
 }
 
@@ -184,10 +198,21 @@ fn render_tracks(frame: &mut Frame<'_>, area: Rect, model: &Model) {
         );
         return;
     };
-    let Some(media) = &item.media else {
-        let message = item.error.as_deref().unwrap_or("Waiting for FFprobe…");
+    if let Some(error) = &item.error {
         frame.render_widget(
-            Paragraph::new(message)
+            Paragraph::new(format!(
+                "Error: {error}\n\nPress r to probe and plan this item again."
+            ))
+            .style(status_style(QueueStatus::Failed, model.color))
+            .wrap(Wrap { trim: true })
+            .block(block),
+            area,
+        );
+        return;
+    }
+    let Some(media) = &item.media else {
+        frame.render_widget(
+            Paragraph::new("Waiting for FFprobe…")
                 .wrap(Wrap { trim: true })
                 .block(block),
             area,
@@ -327,18 +352,27 @@ fn render_settings(frame: &mut Frame<'_>, area: Rect, model: &Model) {
         let (name, value) = model.settings.field_label(index);
         Row::new(vec![Cell::from(name), Cell::from(value)])
     });
+    let locked = model.phase != AppPhase::Idle;
+    let title = if locked {
+        "Settings (locked until batch cleanup finishes)"
+    } else {
+        "Settings (h/l or Enter to change)"
+    };
     let table = Table::new(rows, [Constraint::Length(16), Constraint::Min(12)])
         .header(
             Row::new(["Setting", "Session value"])
                 .style(secondary(model.color).add_modifier(Modifier::BOLD)),
         )
+        .style(if locked {
+            muted(model.color)
+        } else {
+            Style::default()
+        })
         .row_highlight_style(selection(model.color))
         .highlight_symbol("> ")
-        .block(focused_block(
-            "Settings (h/l or Enter to change)",
-            model.color,
-        ));
-    let mut state = TableState::default().with_selected(Some(model.settings.selected_field));
+        .block(focused_block(title, model.color));
+    let selected = (!locked).then_some(model.settings.selected_field);
+    let mut state = TableState::default().with_selected(selected);
     frame.render_stateful_widget(table, area, &mut state);
 }
 
@@ -529,11 +563,13 @@ fn status_style(status: QueueStatus, color: bool) -> Style {
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::panic)]
 mod tests {
+    use std::path::PathBuf;
+
     use ratatui::{Terminal, backend::TestBackend};
     use sonicmux_runtime::{DefaultConfig, DiscoveryRequest, PartialConfig, merge_config};
 
     use super::*;
-    use crate::model::UiSettings;
+    use crate::model::{Msg, UiSettings};
 
     fn model() -> Model {
         let config = merge_config(
@@ -598,6 +634,37 @@ mod tests {
         assert!(screen.contains("Session value"));
         assert!(screen.contains("switch screens"));
         assert!(screen.contains("cancel and wait for cleanup"));
+    }
+
+    #[test]
+    fn long_queues_follow_selection_without_rendering_every_row() {
+        let mut model = model();
+        let paths = (0..30)
+            .map(|index| PathBuf::from(format!("movie-{index:02}.mkv")))
+            .collect();
+        let _ = model.update(Msg::InputsDiscovered(Ok(paths)));
+        model.selected = Some(29);
+
+        let screen = render_text(60, 16, &model);
+        assert!(screen.contains("Queue (24–30 of 30)"));
+        assert!(screen.contains("movie-29.mkv"));
+        assert!(!screen.contains("movie-00.mkv"));
+    }
+
+    #[test]
+    fn failures_and_locked_settings_explain_the_recovery_path() {
+        let mut model = model();
+        let _ = model.update(Msg::InputsDiscovered(Ok(vec![PathBuf::from("broken.mkv")])));
+        model.queue[0].status = QueueStatus::Failed;
+        model.queue[0].error = Some("ffprobe rejected the file".to_owned());
+        model.screen = Screen::Tracks;
+        let failed = render_text(80, 24, &model);
+        assert!(failed.contains("Press r to probe and plan this item again"));
+
+        model.screen = Screen::Settings;
+        model.phase = AppPhase::Running;
+        let locked = render_text(80, 24, &model);
+        assert!(locked.contains("locked until batch cleanup finishes"));
     }
 
     #[test]

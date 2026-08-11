@@ -484,7 +484,10 @@ impl Model {
                 KeyCode::Esc => {}
                 KeyCode::Enter => {
                     if value.trim().is_empty() {
-                        self.overlay = Some(Overlay::Notice("path cannot be empty".to_owned()));
+                        self.overlay = Some(Overlay::Notice(
+                            "Path cannot be empty. Close this message and press a to try again."
+                                .to_owned(),
+                        ));
                     } else {
                         let mut request = self.discovery_template.clone();
                         request.roots = vec![OsString::from(value)];
