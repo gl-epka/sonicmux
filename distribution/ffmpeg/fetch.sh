@@ -36,7 +36,8 @@ download() {
     echo "refusing to replace existing download path: $destination" >&2
     exit 1
   fi
-  curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
+  curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 \
+    --proto '=https' --tlsv1.2 \
     --output "$temporary" "$url"
   mv -- "$temporary" "$destination"
 }
