@@ -18,14 +18,16 @@ pub(crate) struct InputReader {
 }
 
 impl InputReader {
-    pub(crate) fn spawn(sender: mpsc::Sender<Msg>) -> Self {
+    pub(crate) fn spawn(sender: mpsc::Sender<Msg>) -> std::io::Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
         let thread = thread::Builder::new()
             .name("sonicmux-tui-input".to_owned())
-            .spawn(move || read_loop(&sender, &thread_stop))
-            .ok();
-        Self { stop, thread }
+            .spawn(move || read_loop(&sender, &thread_stop))?;
+        Ok(Self {
+            stop,
+            thread: Some(thread),
+        })
     }
 
     pub(crate) fn stop(mut self) {
@@ -66,13 +68,16 @@ fn read_loop(sender: &mpsc::Sender<Msg>, stop: &AtomicBool) {
                 }
                 Ok(_) => {}
                 Err(error) => {
-                    tracing::error!(%error, "terminal input failed");
+                    let _ignored = sender
+                        .blocking_send(Msg::TaskFailed(format!("terminal input failed: {error}")));
                     break;
                 }
             },
             Ok(false) => {}
             Err(error) => {
-                tracing::error!(%error, "terminal input polling failed");
+                let _ignored = sender.blocking_send(Msg::TaskFailed(format!(
+                    "terminal input polling failed: {error}"
+                )));
                 break;
             }
         }

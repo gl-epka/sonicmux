@@ -300,6 +300,7 @@ pub(crate) enum Msg {
     BatchSnapshot(Arc<BatchSnapshot>),
     BatchEvent(BatchEvent),
     EventsLagged(u64),
+    TaskFailed(String),
     BatchFinished(Result<BatchReport, SchedulerError>),
 }
 
@@ -378,6 +379,14 @@ impl Model {
             Msg::EventsLagged(count) => self.log(format!(
                 "event receiver lagged by {count}; recovered from the latest snapshot"
             )),
+            Msg::TaskFailed(message) => {
+                self.log(message.clone());
+                self.overlay = Some(Overlay::Notice(message));
+                if self.phase == AppPhase::Running {
+                    self.phase = AppPhase::Cancelling;
+                    return vec![Effect::CancelBatch];
+                }
+            }
             Msg::BatchFinished(result) => self.on_batch_finished(result),
             Msg::Input(_) => {}
         }
@@ -1091,6 +1100,22 @@ mod tests {
         assert!(matches!(effects.as_slice(), [Effect::CancelBatch]));
         assert_eq!(model.phase, AppPhase::Cancelling);
         assert!(!model.should_quit);
+    }
+
+    #[test]
+    fn background_failure_is_visible_and_cancels_active_work() {
+        let mut model = model();
+        model.phase = AppPhase::Running;
+        let effects = model.update(Msg::TaskFailed("input reader stopped".to_owned()));
+        assert!(matches!(effects.as_slice(), [Effect::CancelBatch]));
+        assert_eq!(model.phase, AppPhase::Cancelling);
+        assert!(matches!(model.overlay, Some(Overlay::Notice(_))));
+        assert!(
+            model
+                .logs
+                .back()
+                .is_some_and(|line| line.contains("input reader"))
+        );
     }
 
     #[test]

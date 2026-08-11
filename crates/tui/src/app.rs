@@ -55,6 +55,14 @@ impl App {
         overrides.log_file = arguments.log_file.clone();
         overrides.color = arguments.no_color.then(|| "never".to_owned());
         let config = load_effective_config(&config_path, overrides)?;
+        if let Some(directory) = config.output_directory.as_ref() {
+            if !directory.value().is_dir() {
+                return Err(eyre!(
+                    "output directory does not exist: {}",
+                    directory.value().display()
+                ));
+            }
+        }
         let observability = init_tracing_with(ObservabilityOptions {
             filter: std::env::var("RUST_LOG").unwrap_or_else(|_| "sonicmux=info,warn".to_owned()),
             console: false,
@@ -107,7 +115,8 @@ impl App {
 
     async fn run_loop(&mut self, terminal: &mut ratatui::DefaultTerminal) -> Result<()> {
         let (sender, mut receiver) = mpsc::channel(256);
-        let input = InputReader::spawn(sender.clone());
+        let input = InputReader::spawn(sender.clone())
+            .wrap_err("failed to start the terminal input reader")?;
         if let Some(effect) = self.model.startup_effect() {
             self.apply_effect(effect, &sender);
         }
@@ -135,6 +144,17 @@ impl App {
                         self.apply_effect(effect, &sender);
                     }
                     dirty = true;
+                }
+                joined = self.tasks.join_next(), if !self.tasks.is_empty() => {
+                    if let Some(Err(error)) = joined {
+                        let effects = self.model.update(Msg::TaskFailed(format!(
+                            "background task failed: {error}"
+                        )));
+                        for effect in effects {
+                            self.apply_effect(effect, &sender);
+                        }
+                        dirty = true;
+                    }
                 }
             }
         }
