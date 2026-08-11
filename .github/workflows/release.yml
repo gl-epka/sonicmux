@@ -349,10 +349,12 @@ jobs:
           Compress-Archive -LiteralPath ffmpeg-package -DestinationPath "release-assets/sonicmux-ffmpeg-8.1.2-${{ matrix.target }}.zip"
           Copy-Item -LiteralPath "$env:RUNNER_TEMP/ffmpeg-install/build-manifest.json" -Destination "release-assets/ffmpeg-build-${{ matrix.target }}.json"
           Copy-Item -LiteralPath "$env:RUNNER_TEMP/ffmpeg-install/changes.diff" -Destination "release-assets/ffmpeg-changes-${{ matrix.target }}.diff"
-          $msi = Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/msi" -Filter *.msi -File -ErrorAction Stop | Select-Object -Single
-          $nsis = Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/nsis" -Filter *-setup.exe -File -ErrorAction Stop | Select-Object -Single
-          Copy-Item -LiteralPath $msi.FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview.msi"
-          Copy-Item -LiteralPath $nsis.FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview-setup.exe"
+          $msi = @(Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/msi" -Filter *.msi -File -ErrorAction Stop)
+          $nsis = @(Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/nsis" -Filter *-setup.exe -File -ErrorAction Stop)
+          if ($msi.Count -ne 1) { throw "Expected exactly one MSI, found $($msi.Count)" }
+          if ($nsis.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($nsis.Count)" }
+          Copy-Item -LiteralPath $msi[0].FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview.msi"
+          Copy-Item -LiteralPath $nsis[0].FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview-setup.exe"
       - name: Upload release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -409,7 +411,8 @@ jobs:
       - name: Install frontend dependencies
         working-directory: crates/gui
         run: npm ci
-      - name: Build unsigned universal GUI packages
+      - name: Build signed universal GUI packages
+        if: env.APPLE_SIGNING_IDENTITY != ''
         working-directory: crates/gui
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -418,6 +421,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run tauri build -- --target universal-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
+      - name: Build unsigned universal GUI packages
+        if: env.APPLE_SIGNING_IDENTITY == ''
+        working-directory: crates/gui
         run: npm run tauri build -- --target universal-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
       - name: Verify Apple signature and notarization when credentials exist
         if: env.APPLE_SIGNING_IDENTITY != ''
