@@ -630,17 +630,17 @@ impl GuiService {
         state.eta_seconds = snapshot.eta().map(|value| value.as_secs());
         let active_ids = state.active_ids.clone();
         for file in snapshot.files() {
-            if let Some(id) = active_ids.get(file.id().get()) {
-                if let Some(item) = state.queue.iter_mut().find(|item| item.id == *id) {
-                    item.status = item_status(file.status());
-                    item.progress_milli = match (file.position_us(), file.duration_us()) {
-                        (Some(position), Some(duration)) if duration > 0 => {
-                            Some(((position.saturating_mul(1_000) / duration).min(1_000)) as u16)
-                        }
-                        _ => None,
-                    };
-                    item.eta_seconds = file.eta().map(|value| value.as_secs());
-                }
+            if let Some(id) = active_ids.get(file.id().get())
+                && let Some(item) = state.queue.iter_mut().find(|item| item.id == *id)
+            {
+                item.status = item_status(file.status());
+                item.progress_milli = match (file.position_us(), file.duration_us()) {
+                    (Some(position), Some(duration)) if duration > 0 => {
+                        Some(((position.saturating_mul(1_000) / duration).min(1_000)) as u16)
+                    }
+                    _ => None,
+                };
+                item.eta_seconds = file.eta().map(|value| value.as_secs());
             }
         }
         drop(state);
@@ -651,28 +651,27 @@ impl GuiService {
         let mut state = self.inner.state.lock().await;
         let active_ids = state.active_ids.clone();
         for result in report.results() {
-            if let Some(id) = active_ids.get(result.id().get()) {
-                if let Some(item) = state.queue.iter_mut().find(|item| item.id == *id) {
-                    item.progress_milli = Some(1_000);
-                    item.eta_seconds = Some(0);
-                    match result.outcome() {
-                        FileOutcome::Succeeded(_) => item.status = ItemStatus::Succeeded,
-                        FileOutcome::Skipped(_) => item.status = ItemStatus::Skipped,
-                        FileOutcome::Planned(_) => item.status = ItemStatus::Planned,
-                        FileOutcome::Failed(failure) => {
-                            item.status = ItemStatus::Failed;
-                            item.error = Some(format!(
-                                "{} failed: {}. Fix the cause and retry.",
-                                failure.stage().as_str(),
-                                failure.message()
-                            ));
-                        }
-                        FileOutcome::Cancelled(_) => item.status = ItemStatus::Cancelled,
-                        _ => {
-                            item.status = ItemStatus::Failed;
-                            item.error =
-                                Some("Unknown scheduler result. Retry the item.".to_owned());
-                        }
+            if let Some(id) = active_ids.get(result.id().get())
+                && let Some(item) = state.queue.iter_mut().find(|item| item.id == *id)
+            {
+                item.progress_milli = Some(1_000);
+                item.eta_seconds = Some(0);
+                match result.outcome() {
+                    FileOutcome::Succeeded(_) => item.status = ItemStatus::Succeeded,
+                    FileOutcome::Skipped(_) => item.status = ItemStatus::Skipped,
+                    FileOutcome::Planned(_) => item.status = ItemStatus::Planned,
+                    FileOutcome::Failed(failure) => {
+                        item.status = ItemStatus::Failed;
+                        item.error = Some(format!(
+                            "{} failed: {}. Fix the cause and retry.",
+                            failure.stage().as_str(),
+                            failure.message()
+                        ));
+                    }
+                    FileOutcome::Cancelled(_) => item.status = ItemStatus::Cancelled,
+                    _ => {
+                        item.status = ItemStatus::Failed;
+                        item.error = Some("Unknown scheduler result. Retry the item.".to_owned());
                     }
                 }
             }

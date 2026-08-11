@@ -83,13 +83,13 @@ pub fn resolve_toolchain_hybrid(
             source: ToolchainSource::Explicit,
         });
     }
-    if let Some(directory) = bundled_directory {
-        if let Ok(paths) = resolve_explicit(directory) {
-            return Ok(ResolvedToolchain {
-                paths,
-                source: ToolchainSource::Bundled,
-            });
-        }
+    if let Some(directory) = bundled_directory
+        && let Ok(paths) = resolve_explicit(directory)
+    {
+        return Ok(ResolvedToolchain {
+            paths,
+            source: ToolchainSource::Bundled,
+        });
     }
     resolve_path().map(|paths| ResolvedToolchain {
         paths,

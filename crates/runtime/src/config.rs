@@ -771,13 +771,13 @@ fn validate_profiles(profiles: &BTreeMap<String, ProfileFile>) -> Result<(), Con
                     reason: "must be greater than zero".to_owned(),
                 });
             }
-            if let Some(layouts) = &rule.allowed_layouts {
-                if layouts.is_empty() || layouts.iter().any(|value| value.trim().is_empty()) {
-                    return Err(ConfigError::InvalidValue {
-                        field: "allowed-layouts",
-                        reason: "must contain non-empty layout names".to_owned(),
-                    });
-                }
+            if let Some(layouts) = &rule.allowed_layouts
+                && (layouts.is_empty() || layouts.iter().any(|value| value.trim().is_empty()))
+            {
+                return Err(ConfigError::InvalidValue {
+                    field: "allowed-layouts",
+                    reason: "must contain non-empty layout names".to_owned(),
+                });
             }
         }
     }
