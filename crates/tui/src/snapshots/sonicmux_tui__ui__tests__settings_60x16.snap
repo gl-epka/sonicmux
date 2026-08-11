@@ -1,0 +1,20 @@
+---
+source: crates/tui/src/ui.rs
+expression: "render_text(60, 16, &compact)"
+---
+ SonicMux generic-tv · AC3 640k · jobs 4    idle
+ 1 Queue  │  2 Tracks  │  3 Logs  │  4 Settings
+
+┌Settings (h/l or Enter to change)─────────────────────────┐
+│  Setting          Session value                          │
+│> Profile          generic-tv                             │
+│  Action           convert                                │
+│  Codec            ac3                                    │
+│  Bitrate          640k                                   │
+│  Channels         keep-up-to-5.1                         │
+│  Mode             add                                    │
+│  Jobs             4                                      │
+│  Storage          balanced                               │
+└──────────────────────────────────────────────────────────┘
+                         Overall --
+a add  s start  c cancel  j/k move  ? help

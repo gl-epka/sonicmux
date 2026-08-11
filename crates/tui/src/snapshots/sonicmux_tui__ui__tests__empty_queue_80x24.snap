@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/ui.rs
+expression: "render_text(80, 24, &empty)"
+---
+ SonicMux generic-tv · AC3 640k · jobs 4    idle
+ 1 Queue  │  2 Tracks  │  3 Logs  │  4 Settings
+
+┌Queue─────────────────────────────────────────────────────────────────────────┐
+│                          No MKV files in the queue.                          │
+│                                                                              │
+│              Press a to add a file, directory, or glob pattern.              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                   Overall --
+a add  d remove  Space enable  s start  c cancel  j/k move  ? help  q quit

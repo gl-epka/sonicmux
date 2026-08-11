@@ -1,18 +1,12 @@
 #![doc = "Terminal user interface entry point for SonicMux."]
 #![forbid(unsafe_code)]
 
+use clap::Parser;
 use color_eyre::eyre::Result;
+use sonicmux_tui::{App, TuiArgs};
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     color_eyre::install()?;
-    sonicmux_runtime::observability::init_tracing()?;
-
-    tracing::info!(
-        version = env!("CARGO_PKG_VERSION"),
-        domain = sonicmux_core::CRATE_NAME,
-        "starting SonicMux TUI skeleton"
-    );
-    println!("SonicMux TUI skeleton; interface arrives in M6.");
-
-    Ok(())
+    App::new(TuiArgs::parse())?.run().await
 }
