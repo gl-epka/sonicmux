@@ -32,7 +32,7 @@ case "${OSTYPE:-}" in
     configure_flags+=("--cc=${CC:-clang}")
     ;;
   msys*|cygwin*)
-    configure_flags+=("--target-os=mingw32")
+    configure_flags+=("--target-os=mingw32" "--cc=${CC:-gcc}")
     ;;
 esac
 
