@@ -4,6 +4,12 @@
 - First manual target: Windows 11 x64
 - Status: Pending a physical or virtual Windows run
 
+CI first launches the release executable on `windows-latest`, verifies the native
+window title and 760×560 minimum-size contract, and publishes
+`m7-windows-smoke.json` plus `m7-windows-smoke.png` in the
+`sonicmux-m7-windows-manual` artifact. Review that evidence before the interactive
+checks below.
+
 Record the tester, Windows build, WebView2 version, FFmpeg build, commit, date,
 and evidence links before changing the status to `Passed`.
 

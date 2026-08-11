@@ -156,10 +156,21 @@ jobs:
       - name: Build native desktop application
         working-directory: crates/gui
         run: npm run tauri build -- --no-bundle
-      - name: Upload Windows manual-test executable
+      - name: Smoke-test the native Windows window
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./crates/gui/scripts/windows-gui-smoke.ps1 `
+            -Executable ./target/release/sonicmux-gui.exe `
+            -Screenshot ./target/m7-windows-smoke.png `
+            -Report ./target/m7-windows-smoke.json
+      - name: Upload Windows validation bundle
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: sonicmux-m7-windows-manual
-          path: target/release/sonicmux-gui.exe
+          path: |
+            target/release/sonicmux-gui.exe
+            target/m7-windows-smoke.png
+            target/m7-windows-smoke.json
           if-no-files-found: error
