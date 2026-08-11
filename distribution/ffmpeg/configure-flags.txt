@@ -1,0 +1,10 @@
+--disable-autodetect
+--disable-debug
+--disable-doc
+--disable-ffplay
+--disable-gpl
+--disable-network
+--disable-nonfree
+--disable-shared
+--enable-small
+--enable-static
