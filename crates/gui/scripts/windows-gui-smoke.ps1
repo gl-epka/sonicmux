@@ -6,6 +6,9 @@ param(
     [string]$Screenshot,
 
     [Parameter(Mandatory = $true)]
+    [string]$NativeScreenshot,
+
+    [Parameter(Mandatory = $true)]
     [string]$Report
 )
 
@@ -45,10 +48,79 @@ public static class SonicMuxWindow {
 }
 "@
 
+function Invoke-CdpCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Net.WebSockets.ClientWebSocket]$Socket,
+
+        [Parameter(Mandatory = $true)]
+        [int]$Id,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Method,
+
+        [hashtable]$Parameters = @{}
+    )
+
+    $message = [ordered]@{
+        id = $Id
+        method = $Method
+        params = $Parameters
+    } | ConvertTo-Json -Compress -Depth 20
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($message)
+    $segment = [ArraySegment[byte]]::new($bytes)
+    $Socket.SendAsync(
+        $segment,
+        [System.Net.WebSockets.WebSocketMessageType]::Text,
+        $true,
+        [System.Threading.CancellationToken]::None
+    ).GetAwaiter().GetResult()
+
+    do {
+        $stream = [System.IO.MemoryStream]::new()
+        try {
+            do {
+                $buffer = [byte[]]::new(65536)
+                $receiveSegment = [ArraySegment[byte]]::new($buffer)
+                $receiveResult = $Socket.ReceiveAsync(
+                    $receiveSegment,
+                    [System.Threading.CancellationToken]::None
+                ).GetAwaiter().GetResult()
+
+                if ($receiveResult.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
+                    throw "WebView2 closed the DevTools connection unexpectedly."
+                }
+
+                $stream.Write($buffer, 0, $receiveResult.Count)
+            } while (-not $receiveResult.EndOfMessage)
+
+            $payload = [System.Text.Encoding]::UTF8.GetString($stream.ToArray()) | ConvertFrom-Json
+            $payloadIdProperty = $payload.PSObject.Properties["id"]
+        }
+        finally {
+            $stream.Dispose()
+        }
+    } while (($null -eq $payloadIdProperty) -or ($payloadIdProperty.Value -ne $Id))
+
+    $errorProperty = $payload.PSObject.Properties["error"]
+    if ($null -ne $errorProperty) {
+        throw "DevTools command '$Method' failed: $($errorProperty.Value.message)"
+    }
+
+    return $payload.result
+}
+
 $resolvedExecutable = (Resolve-Path -LiteralPath $Executable).Path
 $screenshotDirectory = Split-Path -Parent $Screenshot
+$nativeScreenshotDirectory = Split-Path -Parent $NativeScreenshot
 $reportDirectory = Split-Path -Parent $Report
-New-Item -ItemType Directory -Force -Path $screenshotDirectory, $reportDirectory | Out-Null
+New-Item -ItemType Directory -Force -Path $screenshotDirectory, $nativeScreenshotDirectory, $reportDirectory | Out-Null
+
+$portReservation = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$portReservation.Start()
+$debuggingPort = ([System.Net.IPEndPoint]$portReservation.LocalEndpoint).Port
+$portReservation.Stop()
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-address=127.0.0.1 --remote-debugging-port=$debuggingPort --remote-allow-origins=*"
 
 $process = Start-Process -FilePath $resolvedExecutable -PassThru
 
@@ -102,15 +174,82 @@ try {
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {
         $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
-        $bitmap.Save($Screenshot, [System.Drawing.Imaging.ImageFormat]::Png)
+        $bitmap.Save($NativeScreenshot, [System.Drawing.Imaging.ImageFormat]::Png)
     }
     finally {
         $graphics.Dispose()
         $bitmap.Dispose()
     }
 
+    $debugDeadline = [DateTime]::UtcNow.AddSeconds(30)
+    do {
+        try {
+            $targets = Invoke-RestMethod -Uri "http://127.0.0.1:$debuggingPort/json/list" -TimeoutSec 2
+            $pageTarget = $targets | Where-Object { $_.type -eq "page" } | Select-Object -First 1
+        }
+        catch {
+            $pageTarget = $null
+        }
+
+        if ($null -eq $pageTarget) {
+            Start-Sleep -Milliseconds 250
+        }
+    } while (($null -eq $pageTarget) -and ([DateTime]::UtcNow -lt $debugDeadline))
+
+    if ($null -eq $pageTarget) {
+        throw "WebView2 did not expose a debuggable page within 30 seconds."
+    }
+
+    $socket = [System.Net.WebSockets.ClientWebSocket]::new()
+    try {
+        $socket.ConnectAsync(
+            [Uri]$pageTarget.webSocketDebuggerUrl,
+            [System.Threading.CancellationToken]::None
+        ).GetAwaiter().GetResult()
+
+        $commandId = 1
+        Invoke-CdpCommand -Socket $socket -Id $commandId -Method "Page.enable" | Out-Null
+        $commandId++
+        Invoke-CdpCommand -Socket $socket -Id $commandId -Method "Runtime.enable" | Out-Null
+
+        $domDeadline = [DateTime]::UtcNow.AddSeconds(30)
+        do {
+            $commandId++
+            $evaluation = Invoke-CdpCommand -Socket $socket -Id $commandId -Method "Runtime.evaluate" -Parameters @{
+                expression = "JSON.stringify({readyState: document.readyState, text: document.body?.innerText ?? '', width: window.innerWidth, height: window.innerHeight})"
+                returnByValue = $true
+            }
+            $webViewState = $evaluation.result.value | ConvertFrom-Json
+            $domReady = (
+                ($webViewState.readyState -eq "complete") -and
+                ($webViewState.text -like "*SonicMux*") -and
+                ($webViewState.text -like "*FFmpeg*")
+            )
+
+            if (-not $domReady) {
+                Start-Sleep -Milliseconds 250
+            }
+        } while ((-not $domReady) -and ([DateTime]::UtcNow -lt $domDeadline))
+
+        if (-not $domReady) {
+            throw "WebView2 DOM did not render the expected SonicMux and FFmpeg content."
+        }
+
+        $commandId++
+        $capture = Invoke-CdpCommand -Socket $socket -Id $commandId -Method "Page.captureScreenshot" -Parameters @{
+            format = "png"
+            fromSurface = $true
+            captureBeyondViewport = $false
+        }
+        [System.IO.File]::WriteAllBytes($Screenshot, [Convert]::FromBase64String($capture.data))
+    }
+    finally {
+        $socket.Dispose()
+    }
+
     $executableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resolvedExecutable).Hash.ToLowerInvariant()
     $screenshotHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Screenshot).Hash.ToLowerInvariant()
+    $nativeScreenshotHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $NativeScreenshot).Hash.ToLowerInvariant()
     [ordered]@{
         result = "passed"
         executable = Split-Path -Leaf $resolvedExecutable
@@ -119,12 +258,19 @@ try {
         window_title = $process.MainWindowTitle
         window_width = $actualWidth
         window_height = $actualHeight
+        webview_ready_state = $webViewState.readyState
+        webview_width = $webViewState.width
+        webview_height = $webViewState.height
+        webview_text_characters = $webViewState.text.Length
+        expected_content = @("SonicMux", "FFmpeg")
         screenshot = Split-Path -Leaf $Screenshot
         screenshot_sha256 = $screenshotHash
+        native_screenshot = Split-Path -Leaf $NativeScreenshot
+        native_screenshot_sha256 = $nativeScreenshotHash
         checked_at_utc = [DateTime]::UtcNow.ToString("o")
     } | ConvertTo-Json | Set-Content -LiteralPath $Report -Encoding utf8
 
-    Write-Host "SonicMux native window passed: $($actualWidth)x$($actualHeight)."
+    Write-Host "SonicMux native window and WebView2 DOM passed: $($actualWidth)x$($actualHeight)."
 }
 finally {
     if (-not $process.HasExited) {

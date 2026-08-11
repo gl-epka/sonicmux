@@ -163,6 +163,7 @@ jobs:
           ./crates/gui/scripts/windows-gui-smoke.ps1 `
             -Executable ./target/release/sonicmux-gui.exe `
             -Screenshot ./target/m7-windows-smoke.png `
+            -NativeScreenshot ./target/m7-windows-native.png `
             -Report ./target/m7-windows-smoke.json
       - name: Upload Windows validation bundle
         if: runner.os == 'Windows'
@@ -172,5 +173,6 @@ jobs:
           path: |
             target/release/sonicmux-gui.exe
             target/m7-windows-smoke.png
+            target/m7-windows-native.png
             target/m7-windows-smoke.json
           if-no-files-found: error
