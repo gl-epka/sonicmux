@@ -256,9 +256,7 @@ fn desktop_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         ),
     )?;
     let help = SubmenuBuilder::new(app, "Help").item(&about).build()?;
-    MenuBuilder::new(app)
-        .items(&[&file, &batch, &help])
-        .build()
+    MenuBuilder::new(app).items(&[&file, &batch, &help]).build()
 }
 
 #[cfg(test)]
