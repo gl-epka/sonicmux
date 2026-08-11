@@ -180,7 +180,7 @@ jobs:
           cache: npm
           cache-dependency-path: crates/gui/package-lock.json
       - name: Install native dependencies
-        run: sudo apt-get update && sudo apt-get install --yes build-essential gnupg jq xz-utils libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        run: sudo apt-get update && sudo apt-get install --yes build-essential gnupg jq nasm xz-utils libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Fetch and verify FFmpeg source
         run: distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
       - name: Build and verify FFmpeg
@@ -265,7 +265,7 @@ jobs:
           msystem: ${{ matrix.msystem }}
           update: true
           install: >-
-            base-devel diffutils gnupg jq make xz
+            base-devel diffutils gnupg jq make nasm xz
             ${{ matrix.toolchain }}
       - name: Fetch, build, and verify FFmpeg
         shell: msys2 {0}
@@ -365,7 +365,7 @@ jobs:
           cache: npm
           cache-dependency-path: crates/gui/package-lock.json
       - name: Install FFmpeg build dependencies
-        run: brew install gnupg jq xz
+        run: brew install gnupg jq nasm xz
       - name: Fetch and build FFmpeg slices
         run: |
           distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
