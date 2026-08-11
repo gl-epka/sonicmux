@@ -77,7 +77,7 @@ function Invoke-CdpCommand {
         [System.Net.WebSockets.WebSocketMessageType]::Text,
         $true,
         [System.Threading.CancellationToken]::None
-    ).GetAwaiter().GetResult()
+    ).GetAwaiter().GetResult() | Out-Null
 
     do {
         $stream = [System.IO.MemoryStream]::new()
@@ -227,7 +227,7 @@ try {
         $socket.ConnectAsync(
             [Uri]$pageTarget.webSocketDebuggerUrl,
             [System.Threading.CancellationToken]::None
-        ).GetAwaiter().GetResult()
+        ).GetAwaiter().GetResult() | Out-Null
 
         $commandId = 1
         Invoke-CdpCommand -Socket $socket -Id $commandId -Method "Page.enable" | Out-Null
