@@ -1006,10 +1006,17 @@ fn remove_next_char(value: &mut String, cursor: usize) {
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::panic)]
 mod tests {
-    use std::ffi::OsString;
+    use std::{ffi::OsString, path::Path, sync::Arc};
 
+    use async_trait::async_trait;
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use sonicmux_backend::{
+        BackendError, BackendExecution, BackendReport, MediaBackend, ProgressEvent,
+    };
     use sonicmux_runtime::{DefaultConfig, PartialConfig, merge_config};
+    use tempfile::tempdir;
+    use tokio::sync::mpsc;
+    use tokio_util::sync::CancellationToken;
 
     use super::*;
 
@@ -1102,5 +1109,69 @@ mod tests {
         let mut model = model();
         model.discovery_template.roots = vec![OsString::from("movie.mkv")];
         assert!(matches!(model.startup_effect(), Some(Effect::Discover(_))));
+    }
+
+    #[derive(Clone)]
+    struct ProbeOnlyBackend {
+        media: MediaInfo,
+    }
+
+    #[async_trait]
+    impl MediaBackend for ProbeOnlyBackend {
+        async fn probe(
+            &self,
+            _path: &Path,
+            cancel: CancellationToken,
+        ) -> Result<MediaInfo, BackendError> {
+            if cancel.is_cancelled() {
+                Err(BackendError::Cancelled)
+            } else {
+                Ok(self.media.clone())
+            }
+        }
+
+        async fn execute(
+            &self,
+            _request: BackendExecution,
+            _progress: mpsc::Sender<ProgressEvent>,
+            _cancel: CancellationToken,
+        ) -> Result<BackendReport, BackendError> {
+            Err(BackendError::Execute {
+                source: Box::new(std::io::Error::other("dry-run must not execute")),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn dry_run_reconciles_authoritative_scheduler_report() {
+        let directory = tempdir().expect("temporary directory is created");
+        let input = directory.path().join("movie.mkv");
+        let media = sonicmux_ffmpeg::parse_probe_output(
+            input.clone(),
+            include_bytes!("../../ffmpeg/tests/fixtures/mixed.json"),
+        )
+        .expect("fixture parses");
+        let mut model = model();
+        model.settings.dry_run = true;
+        let effects = model.update(Msg::InputsDiscovered(Ok(vec![input.clone()])));
+        let id = match effects.as_slice() {
+            [Effect::Probe(id, path)] if path == &input => *id,
+            other => panic!("unexpected effects: {other:?}"),
+        };
+        model.update(Msg::ProbeFinished(id, Ok(media.clone())));
+        assert_eq!(model.queue[0].status, QueueStatus::Ready);
+
+        let request = model.build_batch().expect("ready queue builds a batch");
+        let runtime = sonicmux_runtime::Runtime::new(Arc::new(ProbeOnlyBackend { media }));
+        let report = runtime
+            .start_batch(request, CancellationToken::new())
+            .wait()
+            .await
+            .expect("dry-run scheduler completes");
+        model.update(Msg::BatchFinished(Ok(report)));
+
+        assert_eq!(model.phase, AppPhase::Idle);
+        assert_eq!(model.queue[0].status, QueueStatus::Planned);
+        assert!(model.queue[0].error.is_none());
     }
 }

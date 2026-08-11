@@ -1603,10 +1603,12 @@ dependencies = [
 name = "sonicmux-tui"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "clap",
  "color-eyre",
  "insta",
  "ratatui",
+ "sonicmux-backend",
  "sonicmux-core",
  "sonicmux-ffmpeg",
  "sonicmux-runtime",
