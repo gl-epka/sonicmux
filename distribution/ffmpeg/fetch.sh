@@ -72,7 +72,7 @@ fi
 mkdir -- "$keyring"
 case "${OSTYPE:-}" in
   msys*|cygwin*) ;;
-  *) chmod 700 -- "$keyring" ;;
+  *) chmod 700 "$keyring" ;;
 esac
 GNUPGHOME="$keyring" gpg --batch --import "$signing_key"
 imported_fingerprint=$(GNUPGHOME="$keyring" gpg --batch --with-colons \
