@@ -9,6 +9,9 @@ param(
     [string]$NativeScreenshot,
 
     [Parameter(Mandatory = $true)]
+    [string]$Diagnostics,
+
+    [Parameter(Mandatory = $true)]
     [string]$Report
 )
 
@@ -113,16 +116,24 @@ function Invoke-CdpCommand {
 $resolvedExecutable = (Resolve-Path -LiteralPath $Executable).Path
 $screenshotDirectory = Split-Path -Parent $Screenshot
 $nativeScreenshotDirectory = Split-Path -Parent $NativeScreenshot
+$diagnosticsDirectory = Split-Path -Parent $Diagnostics
 $reportDirectory = Split-Path -Parent $Report
-New-Item -ItemType Directory -Force -Path $screenshotDirectory, $nativeScreenshotDirectory, $reportDirectory | Out-Null
+New-Item -ItemType Directory -Force -Path $screenshotDirectory, $nativeScreenshotDirectory, $diagnosticsDirectory, $reportDirectory | Out-Null
 
 $portReservation = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $portReservation.Start()
 $debuggingPort = ([System.Net.IPEndPoint]$portReservation.LocalEndpoint).Port
 $portReservation.Stop()
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-address=127.0.0.1 --remote-debugging-port=$debuggingPort --remote-allow-origins=*"
+$browserArguments = "--remote-debugging-port=$debuggingPort"
 
-$process = Start-Process -FilePath $resolvedExecutable -PassThru
+$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+$startInfo.FileName = $resolvedExecutable
+$startInfo.UseShellExecute = $false
+$startInfo.Environment["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $browserArguments
+$process = [System.Diagnostics.Process]::Start($startInfo)
+if ($null -eq $process) {
+    throw "Windows did not start the SonicMux process."
+}
 
 try {
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
@@ -179,6 +190,24 @@ try {
     finally {
         $graphics.Dispose()
         $bitmap.Dispose()
+    }
+
+    $webViewProcesses = @(
+        Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+            Select-Object ProcessId, ParentProcessId, CommandLine
+    )
+    [ordered]@{
+        requested_browser_arguments = $browserArguments
+        debugging_port = $debuggingPort
+        processes = $webViewProcesses
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Diagnostics -Encoding utf8
+
+    if ($webViewProcesses.Count -eq 0) {
+        Write-Warning "No msedgewebview2.exe processes were visible to the smoke test."
+    }
+    else {
+        Write-Host "Observed WebView2 processes:"
+        $webViewProcesses | ForEach-Object { Write-Host $_.CommandLine }
     }
 
     $debugDeadline = [DateTime]::UtcNow.AddSeconds(30)
@@ -267,6 +296,7 @@ try {
         screenshot_sha256 = $screenshotHash
         native_screenshot = Split-Path -Leaf $NativeScreenshot
         native_screenshot_sha256 = $nativeScreenshotHash
+        diagnostics = Split-Path -Leaf $Diagnostics
         checked_at_utc = [DateTime]::UtcNow.ToString("o")
     } | ConvertTo-Json | Set-Content -LiteralPath $Report -Encoding utf8
 

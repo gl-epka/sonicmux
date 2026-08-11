@@ -164,9 +164,10 @@ jobs:
             -Executable ./target/release/sonicmux-gui.exe `
             -Screenshot ./target/m7-windows-smoke.png `
             -NativeScreenshot ./target/m7-windows-native.png `
+            -Diagnostics ./target/m7-windows-webview-processes.json `
             -Report ./target/m7-windows-smoke.json
       - name: Upload Windows validation bundle
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && always()
         uses: actions/upload-artifact@v4
         with:
           name: sonicmux-m7-windows-manual
@@ -174,5 +175,6 @@ jobs:
             target/release/sonicmux-gui.exe
             target/m7-windows-smoke.png
             target/m7-windows-native.png
+            target/m7-windows-webview-processes.json
             target/m7-windows-smoke.json
           if-no-files-found: error
