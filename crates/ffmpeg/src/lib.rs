@@ -10,7 +10,9 @@ pub mod probe;
 pub mod progress;
 
 pub use command::{ArgumentBuild, build_execution_arguments};
-pub use discovery::resolve_toolchain;
+pub use discovery::{
+    ResolvedToolchain, ToolchainSource, resolve_toolchain, resolve_toolchain_hybrid,
+};
 pub use error::ToolError;
 pub use execute::ExecutionError;
 pub use probe::{FfmpegCliBackend, FfmpegToolchainPaths, ProbeError, parse_probe_output};

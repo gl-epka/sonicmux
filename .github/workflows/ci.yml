@@ -30,6 +30,8 @@ jobs:
           components: rustfmt, clippy
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install Linux desktop dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Check formatting
         run: cargo fmt --all --check
       - name: Run Clippy
@@ -55,6 +57,9 @@ jobs:
           toolchain: stable
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Build workspace
         run: cargo build --workspace --all-targets
       - name: Test workspace
@@ -73,7 +78,7 @@ jobs:
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
       - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Convert generated DTS fixture
         env:
           SONICMUX_RUN_FFMPEG_TESTS: "1"
@@ -95,6 +100,8 @@ jobs:
           toolchain: beta
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install Linux desktop dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Check workspace
         run: cargo check --workspace --all-targets
 
@@ -110,5 +117,80 @@ jobs:
           toolchain: 1.85.0
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
+      - name: Install Linux desktop dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Check workspace with MSRV
         run: cargo check --workspace --all-targets
+
+  gui:
+    name: Desktop app (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: crates/gui/package-lock.json
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Install frontend dependencies
+        working-directory: crates/gui
+        run: npm ci
+      - name: Test frontend
+        working-directory: crates/gui
+        run: npm test
+      - name: Build native desktop application
+        working-directory: crates/gui
+        run: npm run tauri build -- --no-bundle
+      - name: Preserve production Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./target/m7-windows-manual | Out-Null
+          Copy-Item -LiteralPath ./target/release/sonicmux-gui.exe -Destination ./target/m7-windows-manual/sonicmux-gui.exe
+      - name: Build Windows validation variant
+        if: runner.os == 'Windows'
+        working-directory: crates/gui
+        run: npm run tauri build -- --no-bundle --config src-tauri/tauri.ci.conf.json
+      - name: Smoke-test the native Windows window
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./crates/gui/scripts/windows-gui-smoke.ps1 `
+            -Executable ./target/release/sonicmux-gui.exe `
+            -Screenshot ./target/m7-windows-smoke.png `
+            -NativeScreenshot ./target/m7-windows-native.png `
+            -Diagnostics ./target/m7-windows-webview-processes.json `
+            -Report ./target/m7-windows-smoke.json
+      - name: Upload production Windows executable
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonicmux-m7-windows-manual
+          path: target/m7-windows-manual/sonicmux-gui.exe
+          if-no-files-found: error
+      - name: Upload Windows validation evidence
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonicmux-m7-windows-validation
+          path: |
+            target/m7-windows-smoke.png
+            target/m7-windows-native.png
+            target/m7-windows-webview-processes.json
+            target/m7-windows-smoke.json
+          if-no-files-found: error
