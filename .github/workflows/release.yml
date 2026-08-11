@@ -54,6 +54,18 @@ jobs:
           name: release-notes
           path: RELEASE_NOTES.md
           if-no-files-found: error
+      - name: Fetch and verify FFmpeg source once
+        run: distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
+      - name: Upload verified FFmpeg source
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-source-8.1.2
+          path: |
+            ${{ runner.temp }}/ffmpeg-source/ffmpeg-8.1.2.tar.xz
+            ${{ runner.temp }}/ffmpeg-source/ffmpeg-8.1.2.tar.xz.asc
+            ${{ runner.temp }}/ffmpeg-source/ffmpeg-devel.asc
+          if-no-files-found: error
+          retention-days: 3
 
   cli-linux:
     name: CLI Linux (${{ matrix.target }})
@@ -181,10 +193,14 @@ jobs:
           cache-dependency-path: crates/gui/package-lock.json
       - name: Install native dependencies
         run: sudo apt-get update && sudo apt-get install --yes build-essential gnupg jq nasm xz-utils libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-      - name: Fetch and verify FFmpeg source
-        run: distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
+      - name: Download verified FFmpeg source
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-source-8.1.2
+          path: ${{ runner.temp }}/ffmpeg-source
       - name: Build and verify FFmpeg
         run: |
+          tar -xJf "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2.tar.xz" -C "$RUNNER_TEMP/ffmpeg-source"
           distribution/ffmpeg/build.sh "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2" "$RUNNER_TEMP/ffmpeg-install"
           distribution/ffmpeg/verify.sh "$RUNNER_TEMP/ffmpeg-install/bin/ffmpeg" "$RUNNER_TEMP/ffmpeg-install/bin/ffprobe"
           distribution/ffmpeg/stage-sidecars.sh "$RUNNER_TEMP/ffmpeg-install/bin" "${{ matrix.target }}"
@@ -237,13 +253,13 @@ jobs:
             msystem: UCRT64
             toolchain: mingw-w64-ucrt-x86_64-toolchain
             cc: gcc
-            arch: x86_64
+            ffmpeg_flags: --arch=x86_64
           - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
             msystem: CLANGARM64
             toolchain: mingw-w64-clang-aarch64-toolchain
             cc: clang
-            arch: aarch64
+            ffmpeg_flags: --arch=aarch64 --enable-cross-compile --host-cc=clang
     runs-on: ${{ matrix.runner }}
     environment:
       name: ${{ github.ref_type == 'tag' && 'release-signing' || 'release-preview' }}
@@ -271,13 +287,27 @@ jobs:
           install: >-
             base-devel diffutils gnupg jq make nasm xz
             ${{ matrix.toolchain }}
-      - name: Fetch, build, and verify FFmpeg
+      - name: Download verified FFmpeg source
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-source-8.1.2
+          path: ${{ runner.temp }}/ffmpeg-source
+      - name: Build and verify FFmpeg
         shell: msys2 {0}
         run: |
-          distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
-          CC='${{ matrix.cc }}' SONICMUX_FFMPEG_EXTRA_FLAGS='--arch=${{ matrix.arch }}' distribution/ffmpeg/build.sh "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2" "$RUNNER_TEMP/ffmpeg-install"
-          distribution/ffmpeg/verify.sh "$RUNNER_TEMP/ffmpeg-install/bin/ffmpeg.exe" "$RUNNER_TEMP/ffmpeg-install/bin/ffprobe.exe"
-          distribution/ffmpeg/stage-sidecars.sh "$RUNNER_TEMP/ffmpeg-install/bin" "${{ matrix.target }}"
+          runner_temp=$(cygpath -u "$RUNNER_TEMP")
+          tar -xJf "$runner_temp/ffmpeg-source/ffmpeg-8.1.2.tar.xz" -C "$runner_temp/ffmpeg-source"
+          CC='${{ matrix.cc }}' SONICMUX_FFMPEG_EXTRA_FLAGS='${{ matrix.ffmpeg_flags }}' distribution/ffmpeg/build.sh "$runner_temp/ffmpeg-source/ffmpeg-8.1.2" "$runner_temp/ffmpeg-install"
+          distribution/ffmpeg/verify.sh "$runner_temp/ffmpeg-install/bin/ffmpeg.exe" "$runner_temp/ffmpeg-install/bin/ffprobe.exe"
+          distribution/ffmpeg/stage-sidecars.sh "$runner_temp/ffmpeg-install/bin" "${{ matrix.target }}"
+      - name: Upload FFmpeg configure log on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ffmpeg-config-${{ matrix.target }}
+          path: ${{ runner.temp }}/ffmpeg-source/ffmpeg-8.1.2/ffbuild/config.log
+          if-no-files-found: warn
+          retention-days: 3
       - name: Convert a real DTS fixture with the sidecar
         shell: pwsh
         env:
@@ -341,10 +371,12 @@ jobs:
           Compress-Archive -LiteralPath ffmpeg-package -DestinationPath "release-assets/sonicmux-ffmpeg-8.1.2-${{ matrix.target }}.zip"
           Copy-Item -LiteralPath "$env:RUNNER_TEMP/ffmpeg-install/build-manifest.json" -Destination "release-assets/ffmpeg-build-${{ matrix.target }}.json"
           Copy-Item -LiteralPath "$env:RUNNER_TEMP/ffmpeg-install/changes.diff" -Destination "release-assets/ffmpeg-changes-${{ matrix.target }}.diff"
-          $msi = Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/msi" -Filter *.msi -File -ErrorAction Stop | Select-Object -Single
-          $nsis = Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/nsis" -Filter *-setup.exe -File -ErrorAction Stop | Select-Object -Single
-          Copy-Item -LiteralPath $msi.FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview.msi"
-          Copy-Item -LiteralPath $nsis.FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview-setup.exe"
+          $msi = @(Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/msi" -Filter *.msi -File -ErrorAction Stop)
+          $nsis = @(Get-ChildItem -LiteralPath "target/${{ matrix.target }}/release/bundle/nsis" -Filter *-setup.exe -File -ErrorAction Stop)
+          if ($msi.Count -ne 1) { throw "Expected exactly one MSI, found $($msi.Count)" }
+          if ($nsis.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($nsis.Count)" }
+          Copy-Item -LiteralPath $msi[0].FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview.msi"
+          Copy-Item -LiteralPath $nsis[0].FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview-setup.exe"
       - name: Upload release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -359,7 +391,7 @@ jobs:
     environment:
       name: ${{ github.ref_type == 'tag' && 'release-signing' || 'release-preview' }}
     env:
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      SONICMUX_APPLE_SIGNING_CONFIGURED: ${{ secrets.APPLE_SIGNING_IDENTITY != '' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -376,9 +408,14 @@ jobs:
           cache-dependency-path: crates/gui/package-lock.json
       - name: Install FFmpeg build dependencies
         run: brew install gnupg jq nasm xz
-      - name: Fetch and build FFmpeg slices
+      - name: Download verified FFmpeg source
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ffmpeg-source-8.1.2
+          path: ${{ runner.temp }}/ffmpeg-source
+      - name: Build FFmpeg slices
         run: |
-          distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
+          tar -xJf "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2.tar.xz" -C "$RUNNER_TEMP/ffmpeg-source"
           cp -R "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2" "$RUNNER_TEMP/ffmpeg-source-x86_64"
           distribution/ffmpeg/build.sh "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2" "$RUNNER_TEMP/ffmpeg-arm64"
           CC='clang -arch x86_64' SONICMUX_FFMPEG_EXTRA_FLAGS='--arch=x86_64' distribution/ffmpeg/build.sh "$RUNNER_TEMP/ffmpeg-source-x86_64" "$RUNNER_TEMP/ffmpeg-x86_64"
@@ -401,7 +438,8 @@ jobs:
       - name: Install frontend dependencies
         working-directory: crates/gui
         run: npm ci
-      - name: Build unsigned universal GUI packages
+      - name: Build signed universal GUI packages
+        if: env.SONICMUX_APPLE_SIGNING_CONFIGURED == 'true'
         working-directory: crates/gui
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -411,8 +449,12 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run tauri build -- --target universal-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
+      - name: Build unsigned universal GUI packages
+        if: env.SONICMUX_APPLE_SIGNING_CONFIGURED != 'true'
+        working-directory: crates/gui
+        run: npm run tauri build -- --target universal-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
       - name: Verify Apple signature and notarization when credentials exist
-        if: env.APPLE_SIGNING_IDENTITY != ''
+        if: env.SONICMUX_APPLE_SIGNING_CONFIGURED == 'true'
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
