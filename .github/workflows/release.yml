@@ -384,6 +384,8 @@ jobs:
             > "$RUNNER_TEMP/ffmpeg-universal/build-manifest.json"
           : > "$RUNNER_TEMP/ffmpeg-universal/changes.diff"
           distribution/ffmpeg/verify.sh "$RUNNER_TEMP/ffmpeg-universal/bin/ffmpeg" "$RUNNER_TEMP/ffmpeg-universal/bin/ffprobe"
+          distribution/ffmpeg/stage-sidecars.sh "$RUNNER_TEMP/ffmpeg-arm64/bin" aarch64-apple-darwin
+          distribution/ffmpeg/stage-sidecars.sh "$RUNNER_TEMP/ffmpeg-x86_64/bin" x86_64-apple-darwin
           distribution/ffmpeg/stage-sidecars.sh "$RUNNER_TEMP/ffmpeg-universal/bin" universal-apple-darwin
           SONICMUX_RUN_FFMPEG_TESTS=1 FFMPEG_PATH="$RUNNER_TEMP/ffmpeg-universal/bin/ffmpeg" FFPROBE_PATH="$RUNNER_TEMP/ffmpeg-universal/bin/ffprobe" cargo test --locked -p sonicmux-runtime --test ffmpeg_execution
       - name: Install frontend dependencies
