@@ -19,10 +19,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Configured, bundled-sidecar, then system FFmpeg discovery for the desktop app.
 - Reproducible multi-platform packages, release provenance, and security automation.
 
+### Changed
+
+- Raised the MSRV to Rust 1.88 so the release can use the patched `time 0.3.47`.
+
 ### Security
 
 - Rust-owned GUI path grants and named Tauri capabilities replace raw path IPC.
 - FFmpeg child processes are isolated, reaped on cancellation, and never receive final output paths.
+- Dependency policy, weekly advisory scans, pinned Actions, SBOMs, checksums, and
+  artifact attestations protect the release supply chain.
 
 [Unreleased]: https://github.com/gl-epka/sonicmux/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/gl-epka/sonicmux/releases/tag/v0.1.0

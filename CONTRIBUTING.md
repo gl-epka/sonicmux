@@ -4,7 +4,7 @@ Thank you for helping improve SonicMux.
 
 ## Development setup
 
-Install Rust 1.85 or newer, Node 24, FFmpeg, and the native Tauri prerequisites
+Install Rust 1.88 or newer, Node 24, FFmpeg, and the native Tauri prerequisites
 for your operating system. Then run:
 
 ```console
