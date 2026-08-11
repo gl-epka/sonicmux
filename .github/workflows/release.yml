@@ -236,10 +236,14 @@ jobs:
             target: x86_64-pc-windows-msvc
             msystem: UCRT64
             toolchain: mingw-w64-ucrt-x86_64-toolchain
+            cc: gcc
+            arch: x86_64
           - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
             msystem: CLANGARM64
             toolchain: mingw-w64-clang-aarch64-toolchain
+            cc: clang
+            arch: aarch64
     runs-on: ${{ matrix.runner }}
     environment:
       name: ${{ github.ref_type == 'tag' && 'release-signing' || 'release-preview' }}
@@ -271,7 +275,7 @@ jobs:
         shell: msys2 {0}
         run: |
           distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
-          distribution/ffmpeg/build.sh "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2" "$RUNNER_TEMP/ffmpeg-install"
+          CC='${{ matrix.cc }}' SONICMUX_FFMPEG_EXTRA_FLAGS='--arch=${{ matrix.arch }}' distribution/ffmpeg/build.sh "$RUNNER_TEMP/ffmpeg-source/ffmpeg-8.1.2" "$RUNNER_TEMP/ffmpeg-install"
           distribution/ffmpeg/verify.sh "$RUNNER_TEMP/ffmpeg-install/bin/ffmpeg.exe" "$RUNNER_TEMP/ffmpeg-install/bin/ffprobe.exe"
           distribution/ffmpeg/stage-sidecars.sh "$RUNNER_TEMP/ffmpeg-install/bin" "${{ matrix.target }}"
           SONICMUX_RUN_FFMPEG_TESTS=1 FFMPEG_PATH="$(cygpath -w "$RUNNER_TEMP/ffmpeg-install/bin/ffmpeg.exe")" FFPROBE_PATH="$(cygpath -w "$RUNNER_TEMP/ffmpeg-install/bin/ffprobe.exe")" cargo test --locked -p sonicmux-runtime --test ffmpeg_execution
