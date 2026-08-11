@@ -214,8 +214,13 @@ Documentation includes:
 - a Windows manual checklist covering sidecar, system fallback, cancellation,
   resize, keyboard use, and terminal process cleanup.
 
-M7 is complete only after the three-platform build is green and the Windows
-manual checklist is explicitly signed off.
+M7 is complete only after the three-platform build is green and Windows is
+explicitly signed off. For milestone closure, the project owner accepted a
+CI-assisted native Windows VM check: it launches the application, verifies the
+window contract and rendered WebView DOM, captures reviewable evidence, and
+keeps validation-only browser flags out of the production executable. The full
+interactive Windows checklist remains an M8 release-candidate gate alongside
+the real redistributable FFmpeg payloads and installers it requires.
 
 ## Accepted approval points
 

@@ -108,7 +108,7 @@ npm run tauri dev
 The application checks configured FFmpeg first, then a packaged sidecar pair,
 then the system `PATH`. M7 does not yet distribute third-party FFmpeg payloads
 or signed installers. See [desktop usage, development, and security](docs/gui.md)
-and the [Windows-first manual checklist](docs/testing/m7-windows.md).
+and the [Windows-first validation record](docs/testing/m7-windows.md).
 
 ## Safety model
 

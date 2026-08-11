@@ -1,8 +1,8 @@
-# M7 Windows manual checklist
+# M7 Windows validation
 
 - Milestone: M7
-- First manual target: Windows 11 x64
-- Status: Pending a physical or virtual Windows run
+- First validation target: Windows x64
+- Status: Passed with CI-assisted virtual Windows evidence
 
 CI first launches the release executable on `windows-latest`, verifies the native
 window title and 760×560 minimum-size contract, then uses the local WebView2
@@ -13,8 +13,30 @@ The production executable remains free of debugging flags in the
 screenshot, native-window screenshot, and process diagnostics. Review that
 evidence before the interactive checks below.
 
-Record the tester, Windows build, WebView2 version, FFmpeg build, commit, date,
-and evidence links before changing the status to `Passed`.
+The project owner accepted this native CI-assisted check as the M7 sign-off.
+The production build and validation-only build are separate artifacts; remote
+debugging is absent from the production Tauri configuration and executable.
+
+## M7 evidence record
+
+- Tester: Codex, with visual review of the captured WebView
+- Environment: GitHub-hosted Microsoft Windows Server 2025 x64, build 26100
+- WebView2: 150.0.4078.105
+- Commit: `cda07ba13d86c44a5af5a7a24e937aea2c51f12e`
+- Date: 2026-08-11
+- CI run: <https://github.com/gl-epka/sonicmux/actions/runs/31466627050>
+- Result: native window 760×560; WebView 744×501; DOM ready state `complete`;
+  expected `SonicMux` and `FFmpeg` content present; reviewed screenshot has no
+  horizontal overflow or clipped primary controls
+- Validation screenshot SHA-256:
+  `39d783f3e2a2fa28f2531ea800b9d6ccec3302dbb19fc19a672e2221235b0bf6`
+- Production executable SHA-256:
+  `ed73792724ca47a58aa96667d102a672f5959ed80167e9982488355bd322c96c`
+
+The interactive checks below are intentionally retained for the M8 release
+candidate, when SonicMux will have real redistributable FFmpeg payloads and
+installers. They are not represented as having been performed by the CI smoke
+test.
 
 ## Toolchain delivery
 
@@ -51,14 +73,14 @@ and evidence links before changing the status to `Passed`.
 - [ ] State remains understandable without color and under high contrast.
 - [ ] Reduced-motion preference removes nonessential transitions.
 
-## Sign-off
+## Extended interactive sign-off (M8 release candidate)
 
-Tester: _pending_
+Tester: _pending for M8_
 
-Environment: _pending_
+Environment: _pending for M8_
 
-Commit: _pending_
+Commit: _pending for M8_
 
-Date: _pending_
+Date: _pending for M8_
 
-Result: **Pending**
+Result: **Pending for M8; M7 CI-assisted validation passed**
