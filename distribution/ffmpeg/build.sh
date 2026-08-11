@@ -29,7 +29,7 @@ configure_flags+=("--prefix=$install_directory")
 
 case "${OSTYPE:-}" in
   darwin*)
-    configure_flags+=("--cc=clang")
+    configure_flags+=("--cc=${CC:-clang}")
     ;;
   msys*|cygwin*)
     configure_flags+=("--target-os=mingw32")
@@ -65,7 +65,7 @@ sha256_of() {
 jq -n \
   --arg version "$(jq -er '.version' "$manifest_path")" \
   --arg host "$(uname -a)" \
-  --arg compiler "$(${CC:-cc} --version | head -n 1)" \
+  --arg compiler "$(command ${CC:-cc} --version | head -n 1)" \
   --arg configure "${configure_flags[*]}" \
   --arg ffmpeg_sha256 "$(sha256_of "$ffmpeg_path")" \
   --arg ffprobe_sha256 "$(sha256_of "$ffprobe_path")" \

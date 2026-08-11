@@ -11,8 +11,8 @@ ffprobe_path=$2
 script_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 expected_version=$(jq -er '.version' "$script_directory/manifest.json")
 
-ffmpeg_version=$($ffmpeg_path -version)
-ffprobe_version=$($ffprobe_path -version)
+ffmpeg_version=$("$ffmpeg_path" -version)
+ffprobe_version=$("$ffprobe_path" -version)
 ffmpeg_first_line=$(printf '%s\n' "$ffmpeg_version" | head -n 1)
 ffprobe_first_line=$(printf '%s\n' "$ffprobe_version" | head -n 1)
 
@@ -38,9 +38,9 @@ for forbidden_flag in --enable-gpl --enable-nonfree; do
   fi
 done
 
-decoders=$($ffmpeg_path -hide_banner -decoders)
-encoders=$($ffmpeg_path -hide_banner -encoders)
-formats=$($ffmpeg_path -hide_banner -formats)
+decoders=$("$ffmpeg_path" -hide_banner -decoders)
+encoders=$("$ffmpeg_path" -hide_banner -encoders)
+formats=$("$ffmpeg_path" -hide_banner -formats)
 
 for decoder in dca truehd; do
   if ! grep -Eq "(^|[[:space:]])$decoder([[:space:]]|$)" <<<"$decoders"; then
