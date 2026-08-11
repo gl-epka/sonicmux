@@ -11,7 +11,9 @@ use dto::{
     ToolchainStatusDto,
 };
 use service::GuiService;
-use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{
+    AboutMetadataBuilder, Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
+};
 use tauri::{AppHandle, DragDropEvent, Manager, State, WebviewEvent, WindowEvent, ipc::Channel};
 use tauri_plugin_dialog::DialogExt;
 
@@ -230,7 +232,33 @@ fn desktop_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let batch = SubmenuBuilder::new(app, "Batch")
         .items(&[&start, &cancel])
         .build()?;
-    MenuBuilder::new(app).items(&[&file, &batch]).build()
+    let about = PredefinedMenuItem::about(
+        app,
+        Some("About SonicMux"),
+        Some(
+            AboutMetadataBuilder::new()
+                .name(Some("SonicMux"))
+                .version(Some(env!("CARGO_PKG_VERSION")))
+                .authors(Some(vec!["Gleb Nechaev and SonicMux contributors".to_owned()]))
+                .comments(Some(
+                    "MKV audio compatibility. Bundled FFmpeg 8.1.2 is separately licensed under LGPL-2.1-or-later.",
+                ))
+                .copyright(Some("Copyright © 2026 SonicMux contributors"))
+                .license(Some(
+                    "SonicMux: MIT OR Apache-2.0; bundled FFmpeg: LGPL-2.1-or-later",
+                ))
+                .website(Some("https://github.com/gl-epka/sonicmux"))
+                .website_label(Some("SonicMux on GitHub"))
+                .credits(Some(
+                    "SonicMux contributors\n\nBundled FFmpeg 8.1.2 is separately licensed under LGPL-2.1-or-later. Complete source and notices accompany each release.",
+                ))
+                .build(),
+        ),
+    )?;
+    let help = SubmenuBuilder::new(app, "Help").item(&about).build()?;
+    MenuBuilder::new(app)
+        .items(&[&file, &batch, &help])
+        .build()
 }
 
 #[cfg(test)]
