@@ -15,9 +15,9 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@lucide/svelte": "1.31.0",
+    "@lucide/svelte": "1.40.0",
     "@tauri-apps/api": "2.11.1",
-    "svelte": "5.56.8"
+    "svelte": "5.57.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "5.1.1",
@@ -26,7 +26,7 @@
     "@testing-library/svelte": "5.4.2",
     "@types/node": "20.19.43",
     "jsdom": "30.0.1",
-    "svelte-check": "4.7.5",
+    "svelte-check": "4.7.6",
     "typescript": "6.0.3",
     "vite": "6.4.3",
     "vitest": "4.1.10"
