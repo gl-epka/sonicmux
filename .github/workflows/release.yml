@@ -31,7 +31,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Install stable Rust
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
       - name: Verify versions
@@ -49,7 +49,7 @@ jobs:
       - name: Generate release notes
         run: distribution/release-notes.sh "${RELEASE_TAG#v}" RELEASE_NOTES.md
       - name: Upload release notes
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-notes
           path: RELEASE_NOTES.md
@@ -57,7 +57,7 @@ jobs:
       - name: Fetch and verify FFmpeg source once
         run: distribution/ffmpeg/fetch.sh "$RUNNER_TEMP/ffmpeg-source"
       - name: Upload verified FFmpeg source
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ffmpeg-source-8.1.2
           path: |
@@ -87,7 +87,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust target
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
           target: ${{ matrix.target }}
@@ -99,7 +99,7 @@ jobs:
       - name: Package CLI and TUI
         run: distribution/package-cli-unix.sh "${{ matrix.target }}" release-assets
       - name: Upload release asset
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cli-${{ matrix.target }}
           path: release-assets/*
@@ -121,7 +121,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust target
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
           target: ${{ matrix.target }}
@@ -131,7 +131,7 @@ jobs:
         shell: pwsh
         run: ./distribution/package-cli.ps1 -TargetTriple "${{ matrix.target }}" -OutputDirectory release-assets
       - name: Upload release asset
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cli-${{ matrix.target }}
           path: release-assets/*
@@ -145,7 +145,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust targets
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
           target: aarch64-apple-darwin,x86_64-apple-darwin
@@ -159,7 +159,7 @@ jobs:
       - name: Package CLI and TUI
         run: distribution/package-cli-unix.sh universal-apple-darwin release-assets
       - name: Upload release asset
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cli-universal-apple-darwin
           path: release-assets/*
@@ -181,12 +181,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust target
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
           target: ${{ matrix.target }}
       - name: Install Node 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -194,7 +194,7 @@ jobs:
       - name: Install native dependencies
         run: sudo apt-get update && sudo apt-get install --yes build-essential gnupg jq nasm xz-utils libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Download verified FFmpeg source
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ffmpeg-source-8.1.2
           path: ${{ runner.temp }}/ffmpeg-source
@@ -235,7 +235,7 @@ jobs:
             cp "$RUNNER_TEMP/ffmpeg-source/ffmpeg-devel.asc" release-assets/
           fi
       - name: Upload release assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gui-${{ matrix.target }}
           path: release-assets/*
@@ -269,18 +269,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust target
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
           target: ${{ matrix.target }}
       - name: Install Node 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: crates/gui/package-lock.json
       - name: Install MSYS2 build environment
-        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
           msystem: ${{ matrix.msystem }}
           update: true
@@ -288,7 +288,7 @@ jobs:
             base-devel diffutils gnupg jq make nasm xz
             ${{ matrix.toolchain }}
       - name: Download verified FFmpeg source
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ffmpeg-source-8.1.2
           path: ${{ runner.temp }}/ffmpeg-source
@@ -302,7 +302,7 @@ jobs:
           distribution/ffmpeg/stage-sidecars.sh "$runner_temp/ffmpeg-install/bin" "${{ matrix.target }}"
       - name: Upload FFmpeg configure log on failure
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ffmpeg-config-${{ matrix.target }}
           path: ${{ runner.temp }}/ffmpeg-source/ffmpeg-8.1.2/ffbuild/config.log
@@ -378,7 +378,7 @@ jobs:
           Copy-Item -LiteralPath $msi[0].FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview.msi"
           Copy-Item -LiteralPath $nsis[0].FullName -Destination "release-assets/sonicmux-gui-v$version-${{ matrix.target }}-unsigned-preview-setup.exe"
       - name: Upload release assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gui-${{ matrix.target }}
           path: release-assets/*
@@ -396,12 +396,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Rust targets
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
           target: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Install Node 24
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -409,7 +409,7 @@ jobs:
       - name: Install FFmpeg build dependencies
         run: brew install gnupg jq nasm xz
       - name: Download verified FFmpeg source
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ffmpeg-source-8.1.2
           path: ${{ runner.temp }}/ffmpeg-source
@@ -476,7 +476,7 @@ jobs:
           cp "$RUNNER_TEMP/ffmpeg-universal/build-manifest.json" release-assets/ffmpeg-build-universal-apple-darwin.json
           cp "$RUNNER_TEMP/ffmpeg-universal/changes.diff" release-assets/ffmpeg-changes-universal-apple-darwin.diff
       - name: Upload release assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gui-universal-apple-darwin
           path: release-assets/*
@@ -494,19 +494,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Download CLI assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: cli-*
           path: release-assets
           merge-multiple: true
       - name: Download GUI and FFmpeg assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: gui-*
           path: release-assets
           merge-multiple: true
       - name: Download release notes
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-notes
           path: release-notes
@@ -514,7 +514,7 @@ jobs:
         run: |
           cp THIRD_PARTY_LICENSES.md distribution/ffmpeg/COPYING.LGPLv2.1 distribution/ffmpeg/manifest.json distribution/ffmpeg/configure-flags.txt release-assets/
       - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: .
           format: spdx-json
@@ -526,7 +526,7 @@ jobs:
         with:
           subject-path: release-assets/*
       - name: Upload complete release set
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sonicmux-${{ env.RELEASE_TAG }}-release
           path: release-assets/*
@@ -549,7 +549,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install stable Rust
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
         with:
           toolchain: stable
       - name: Publish registry packages in dependency order
